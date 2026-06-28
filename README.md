@@ -42,3 +42,5 @@ Future plans:
 
 `docker-compose.yml` runs a single nginx container serving `index.html`.
 Structure is intentionally minimal so a C# API container and a database container can be added to the compose file later without rearchitecting.
+
+run docker compose up then navigate to localhost:8080
