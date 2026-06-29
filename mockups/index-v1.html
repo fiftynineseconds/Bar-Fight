@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Band Timeline — v1 Mockup</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d0d0f;
+    --bg2: #0a0a0c;
+    --bg3: #111113;
+    --border: #1e1e2e;
+    --border2: #2a2a3a;
+    --text: #e2e8f0;
+    --muted: #4b5563;
+    --muted2: #6b7280;
+    --font: 'SF Mono', 'Fira Code', Consolas, monospace;
+  }
+
+  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 13px; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+  /* HEADER */
+  #header { display: flex; align-items: center; gap: 16px; padding: 10px 20px; background: var(--bg2); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  #song-title { font-size: 18px; font-weight: 700; cursor: text; outline: none; background: transparent; border: none; border-bottom: 1px solid transparent; color: var(--text); font-family: var(--font); letter-spacing: 0.05em; }
+  #song-title:focus { border-bottom-color: #818cf8; }
+  .spacer { flex: 1; }
+  .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
+  #bpm-input { width: 60px; background: #1a1a2e; border: 1px solid #2d2d4e; color: #818cf8; border-radius: 4px; padding: 3px 6px; font-size: 14px; font-family: var(--font); text-align: center; }
+  .btn { background: #1e1e2e; border: 1px solid var(--muted); color: var(--muted); border-radius: 4px; padding: 5px 12px; cursor: pointer; font-family: var(--font); font-size: 13px; }
+  .btn:hover { border-color: var(--text); color: var(--text); }
+  .btn.green { background: #1a2a1a; border-color: #4ade80; color: #4ade80; }
+  .btn.purple { background: #1a1a2e; border-color: #818cf8; color: #818cf8; }
+
+  /* NOW PLAYING */
+  #now-playing { display: flex; align-items: center; gap: 24px; padding: 10px 20px; border-bottom: 2px solid #333; transition: background 0.3s, border-color 0.3s; flex-shrink: 0; min-height: 52px; background: #1a1a2e; border-bottom-color: #818cf8; }
+  #np-section { font-size: 20px; font-weight: 700; min-width: 120px; color: #818cf8; }
+  #np-bar { color: var(--muted2); font-size: 13px; }
+  #np-bar span { color: var(--text); font-weight: 600; }
+  #np-beat { color: var(--muted2); font-size: 13px; }
+  #np-beat span { color: var(--text); font-weight: 600; }
+  #np-chords { flex: 1; text-align: center; font-size: 15px; font-weight: 600; letter-spacing: 0.15em; color: #818cf8; }
+  #np-next { font-size: 12px; color: var(--muted); }
+
+  /* TIMELINE */
+  #timeline-wrap { position: relative; height: 110px; overflow-x: auto; overflow-y: hidden; background: var(--bg); border-bottom: 1px solid var(--border); flex-shrink: 0; cursor: crosshair; }
+  #timeline-inner { position: relative; height: 100%; width: 2400px; }
+
+  .tl-section {
+    position: absolute;
+    top: 16px; height: 72px;
+    border-radius: 3px; padding: 6px 8px; overflow: hidden;
+  }
+  .tl-section-name { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+  .tl-section-bars { font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .tl-section-chords { font-size: 10px; color: var(--muted2); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .beat-line { position: absolute; top: 0; bottom: 0; width: 1px; }
+
+  #playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: #f87171; box-shadow: 0 0 8px #f87171; z-index: 10; left: 320px; }
+  #playhead-dot { width: 8px; height: 8px; background: #f87171; border-radius: 50%; margin-left: -3px; margin-top: 8px; }
+
+  /* EDITOR */
+  #editor { flex: 1; overflow-y: auto; padding: 12px 20px; background: var(--bg2); }
+  #editor-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  #sections-list { display: flex; flex-direction: column; gap: 6px; }
+  .sec-row { display: flex; align-items: center; gap: 8px; background: var(--bg3); border: 1px solid var(--border); border-radius: 4px; padding: 6px 10px; }
+  .sec-row select, .sec-row input { background: var(--bg); border: 1px solid var(--border2); color: var(--text); border-radius: 3px; padding: 3px 6px; font-size: 12px; font-family: var(--font); }
+  .sec-row input[type=number] { width: 46px; }
+  .sec-row input.chord-input { flex: 1; }
+  .sec-row select.time-sel { width: 58px; }
+  .move-btns { display: flex; flex-direction: column; gap: 1px; }
+  .move-btns button { background: transparent; border: none; color: var(--muted); cursor: pointer; padding: 1px 3px; font-size: 10px; line-height: 1; }
+  .move-btns button:hover { color: var(--text); }
+  .remove-btn { background: transparent; border: none; color: #f87171; cursor: pointer; padding: 2px 6px; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div id="header">
+  <input id="song-title" value="New Song" style="font-size:18px;font-weight:700;background:transparent;border:none;border-bottom:1px solid transparent;color:var(--text);font-family:var(--font);letter-spacing:0.05em;outline:none;" />
+  <div class="spacer"></div>
+  <span class="label">BPM</span>
+  <input id="bpm-input" type="number" value="120" />
+  <button class="btn">■ Stop</button>
+  <button class="btn green">▶ Play</button>
+  <button class="btn">Edit Sections</button>
+</div>
+
+<!-- NOW PLAYING (shown mid-Verse playback) -->
+<div id="now-playing">
+  <div id="np-section">Verse</div>
+  <div id="np-bar">Bar <span>3</span> / <span style="color:var(--muted)">8</span></div>
+  <div id="np-beat">Beat <span>2</span></div>
+  <div id="np-chords">E&nbsp;&nbsp;A&nbsp;&nbsp;E&nbsp;&nbsp;B</div>
+  <div id="np-next">Next: Chorus</div>
+</div>
+
+<!-- TIMELINE -->
+<div id="timeline-wrap">
+  <div id="timeline-inner">
+
+    <!-- beat grid lines (every 40px = 1 beat, darker every 4 = bar) -->
+    <!-- Intro: 4 bars × 4 beats = 160px -->
+    <div class="tl-section" style="left:0px; width:158px; background:#111113; border:1px solid #2a2a3a; border-top:3px solid #4ade80;">
+      <div class="tl-section-name" style="color:#4ade80">Intro</div>
+      <div class="tl-section-bars">4 bars</div>
+      <div class="tl-section-chords">E  A  B  A</div>
+    </div>
+
+    <!-- Verse: 8 bars × 4 beats = 320px -->
+    <div class="tl-section" style="left:160px; width:318px; background:#1a1a2e; border:1px solid #818cf8; border-top:3px solid #818cf8;">
+      <div class="tl-section-name" style="color:#818cf8">Verse</div>
+      <div class="tl-section-bars">8 bars</div>
+      <div class="tl-section-chords">E  A  E  B</div>
+    </div>
+
+    <!-- Chorus: 8 bars × 4 beats = 320px -->
+    <div class="tl-section" style="left:480px; width:318px; background:#111113; border:1px solid #2a2a3a; border-top:3px solid #f87171;">
+      <div class="tl-section-name" style="color:#f87171">Chorus</div>
+      <div class="tl-section-bars">8 bars</div>
+      <div class="tl-section-chords">A  E  B  A</div>
+    </div>
+
+    <!-- Verse 2 -->
+    <div class="tl-section" style="left:800px; width:318px; background:#111113; border:1px solid #2a2a3a; border-top:3px solid #818cf8;">
+      <div class="tl-section-name" style="color:#818cf8">Verse</div>
+      <div class="tl-section-bars">8 bars</div>
+      <div class="tl-section-chords">E  A  E  B</div>
+    </div>
+
+    <!-- Chorus 2 -->
+    <div class="tl-section" style="left:1120px; width:318px; background:#111113; border:1px solid #2a2a3a; border-top:3px solid #f87171;">
+      <div class="tl-section-name" style="color:#f87171">Chorus</div>
+      <div class="tl-section-bars">8 bars</div>
+      <div class="tl-section-chords">A  E  B  A</div>
+    </div>
+
+    <!-- Bridge: 4 bars = 160px -->
+    <div class="tl-section" style="left:1440px; width:158px; background:#111113; border:1px solid #2a2a3a; border-top:3px solid #fb923c;">
+      <div class="tl-section-name" style="color:#fb923c">Bridge</div>
+      <div class="tl-section-bars">4 bars</div>
+      <div class="tl-section-chords">C#m  A  B  B</div>
+    </div>
+
+    <!-- Solo: 8 bars -->
+    <div class="tl-section" style="left:1600px; width:318px; background:#111113; border:1px solid #2a2a3a; border-top:3px solid #22d3ee;">
+      <div class="tl-section-name" style="color:#22d3ee">Solo</div>
+      <div class="tl-section-bars">8 bars</div>
+      <div class="tl-section-chords">E  A  E  B</div>
+    </div>
+
+    <!-- Chorus 3 -->
+    <div class="tl-section" style="left:1920px; width:318px; background:#111113; border:1px solid #2a2a3a; border-top:3px solid #f87171;">
+      <div class="tl-section-name" style="color:#f87171">Chorus</div>
+      <div class="tl-section-bars">8 bars</div>
+      <div class="tl-section-chords">A  E  B  A</div>
+    </div>
+
+    <!-- Outro: 4 bars -->
+    <div class="tl-section" style="left:2240px; width:158px; background:#111113; border:1px solid #2a2a3a; border-top:3px solid #facc15;">
+      <div class="tl-section-name" style="color:#facc15">Outro</div>
+      <div class="tl-section-bars">4 bars</div>
+      <div class="tl-section-chords">E  E  E  E</div>
+    </div>
+
+    <!-- Playhead mid-Verse -->
+    <div id="playhead" style="left:320px;">
+      <div id="playhead-dot"></div>
+    </div>
+  </div>
+</div>
+
+<!-- EDITOR (open) -->
+<div id="editor">
+  <div id="editor-header">
+    <span class="label">Song Sections</span>
+    <button class="btn purple">+ Add Section</button>
+  </div>
+  <div id="sections-list">
+
+    <!-- Intro row -->
+    <div class="sec-row" style="border-left:3px solid #4ade80;">
+      <div class="move-btns">
+        <button disabled style="background:transparent;border:none;color:var(--muted);cursor:pointer;padding:1px 3px;font-size:10px;">▲</button>
+        <button style="background:transparent;border:none;color:var(--muted);cursor:pointer;padding:1px 3px;font-size:10px;">▼</button>
+      </div>
+      <select style="width:110px;color:#4ade80;background:#1a2a1a;border:1px solid var(--border2);color:#4ade80;border-radius:3px;padding:3px 6px;font-size:12px;font-family:var(--font);">
+        <option selected>Intro</option><option>Verse</option><option>Pre-Chorus</option>
+        <option>Chorus</option><option>Bridge</option><option>Solo</option><option>Outro</option><option>Break</option>
+      </select>
+      <span class="label">Bars</span>
+      <input type="number" value="4" style="width:46px;" />
+      <span class="label">Time</span>
+      <select class="time-sel"><option>4/4</option></select>
+      <span class="label">Chords</span>
+      <input class="chord-input" value="E  A  B  A" />
+      <button class="remove-btn">✕</button>
+    </div>
+
+    <!-- Verse row -->
+    <div class="sec-row" style="border-left:3px solid #818cf8;">
+      <div class="move-btns">
+        <button style="background:transparent;border:none;color:var(--muted);cursor:pointer;padding:1px 3px;font-size:10px;">▲</button>
+        <button style="background:transparent;border:none;color:var(--muted);cursor:pointer;padding:1px 3px;font-size:10px;">▼</button>
+      </div>
+      <select style="width:110px;background:#1a1a2e;border:1px solid var(--border2);color:#818cf8;border-radius:3px;padding:3px 6px;font-size:12px;font-family:var(--font);">
+        <option>Intro</option><option selected>Verse</option><option>Pre-Chorus</option>
+        <option>Chorus</option><option>Bridge</option><option>Solo</option><option>Outro</option><option>Break</option>
+      </select>
+      <span class="label">Bars</span>
+      <input type="number" value="8" style="width:46px;" />
+      <span class="label">Time</span>
+      <select class="time-sel"><option>4/4</option></select>
+      <span class="label">Chords</span>
+      <input class="chord-input" value="E  A  E  B" />
+      <button class="remove-btn">✕</button>
+    </div>
+
+    <!-- Chorus row -->
+    <div class="sec-row" style="border-left:3px solid #f87171;">
+      <div class="move-btns">
+        <button style="background:transparent;border:none;color:var(--muted);cursor:pointer;padding:1px 3px;font-size:10px;">▲</button>
+        <button style="background:transparent;border:none;color:var(--muted);cursor:pointer;padding:1px 3px;font-size:10px;">▼</button>
+      </div>
+      <select style="width:110px;background:#2a1a1a;border:1px solid var(--border2);color:#f87171;border-radius:3px;padding:3px 6px;font-size:12px;font-family:var(--font);">
+        <option>Intro</option><option>Verse</option><option>Pre-Chorus</option>
+        <option selected>Chorus</option><option>Bridge</option><option>Solo</option><option>Outro</option><option>Break</option>
+      </select>
+      <span class="label">Bars</span>
+      <input type="number" value="8" style="width:46px;" />
+      <span class="label">Time</span>
+      <select class="time-sel"><option>4/4</option></select>
+      <span class="label">Chords</span>
+      <input class="chord-input" value="A  E  B  A" />
+      <button class="remove-btn">✕</button>
+    </div>
+
+    <div style="color:var(--muted);font-size:11px;padding:4px 2px;font-style:italic;">+ 6 more sections…</div>
+  </div>
+</div>
+
+</body>
+</html>

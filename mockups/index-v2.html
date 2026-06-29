@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Band Timeline — v2 Logic Pro Style</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    /* Logic Pro dark palette */
+    --bg:        #1c1c1e;   /* base window */
+    --bg2:       #2c2c2e;   /* panel surfaces */
+    --bg3:       #3a3a3c;   /* raised controls */
+    --bg4:       #48484a;   /* hovered / selected */
+    --border:    #48484a;
+    --border-sub:#3a3a3c;
+    --text:      #f5f5f7;   /* near-white */
+    --text2:     #ebebf5;
+    --muted:     #8e8e93;
+    --muted2:    #636366;
+    --accent:    #0a84ff;   /* Apple blue */
+    --accent-dim:#0060c0;
+    --green:     #30d158;
+    --red:       #ff453a;
+    --orange:    #ff9f0a;
+    --cyan:      #5ac8fa;
+    --purple:    #bf5af2;
+    --yellow:    #ffd60a;
+    --font-ui:   -apple-system, "SF Pro Text", "Helvetica Neue", sans-serif;
+    --font-mono: "SF Mono", "Fira Code", Consolas, monospace;
+    --radius:    6px;
+    --radius-lg: 10px;
+  }
+
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: 13px;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── TOOLBAR ─────────────────────────────────────────────────── */
+  #toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 0 12px;
+    height: 52px;
+    background: linear-gradient(to bottom, #3a3a3c, #2c2c2e);
+    border-bottom: 1px solid #111;
+    flex-shrink: 0;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset, 0 2px 6px rgba(0,0,0,0.5);
+  }
+
+  /* Song title */
+  #song-title {
+    font-size: 15px;
+    font-weight: 600;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-family: var(--font-ui);
+    letter-spacing: -0.01em;
+    outline: none;
+    width: 160px;
+    padding: 4px 6px;
+    border-radius: var(--radius);
+    transition: background 0.15s;
+  }
+  #song-title:focus { background: rgba(255,255,255,0.07); }
+
+  .toolbar-divider {
+    width: 1px;
+    height: 28px;
+    background: var(--border);
+    margin: 0 12px;
+    flex-shrink: 0;
+  }
+
+  /* Transport cluster */
+  #transport {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    background: #111;
+    border: 1px solid #3a3a3c;
+    border-radius: var(--radius-lg);
+    padding: 3px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.6) inset;
+  }
+  .transport-btn {
+    display: flex; align-items: center; justify-content: center;
+    width: 36px; height: 30px;
+    background: transparent;
+    border: none;
+    border-radius: 7px;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.1s, color 0.1s;
+  }
+  .transport-btn:hover { background: rgba(255,255,255,0.1); color: var(--text); }
+  .transport-btn.active { background: var(--accent); color: #fff; }
+  .transport-btn.stop-btn { font-size: 10px; }
+
+  /* LCD display */
+  #lcd {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 5px 14px;
+    background: #0a0a0a;
+    border: 1px solid #2a2a2a;
+    border-radius: var(--radius-lg);
+    margin: 0 12px;
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.04) inset, 0 2px 4px rgba(0,0,0,0.7) inset;
+    min-width: 200px;
+  }
+  .lcd-block { display: flex; flex-direction: column; align-items: center; }
+  .lcd-value {
+    font-family: var(--font-mono);
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--accent);
+    letter-spacing: 0.02em;
+    line-height: 1;
+  }
+  .lcd-label {
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted2);
+    margin-top: 2px;
+  }
+  .lcd-sep { width: 1px; height: 28px; background: #2a2a2a; }
+
+  /* BPM input inside LCD */
+  #bpm-input {
+    font-family: var(--font-mono);
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--accent);
+    background: transparent;
+    border: none;
+    outline: none;
+    width: 48px;
+    text-align: center;
+    letter-spacing: 0.02em;
+  }
+  #bpm-input:focus { color: #5ac8fa; }
+
+  .spacer { flex: 1; }
+
+  /* Editor toggle — pill button */
+  .pill-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 14px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    color: var(--muted);
+    font-family: var(--font-ui);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .pill-btn:hover { background: var(--bg4); color: var(--text2); border-color: var(--border); }
+  .pill-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .pill-btn svg { flex-shrink: 0; }
+
+  /* ── NOW PLAYING BAR ─────────────────────────────────────────── */
+  #now-playing {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    height: 44px;
+    flex-shrink: 0;
+    border-bottom: 1px solid #111;
+    background: #232325;
+    overflow: hidden;
+    transition: border-color 0.3s;
+    border-bottom: 2px solid var(--accent);
+  }
+
+  #np-section-pill {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 20px;
+    height: 100%;
+    min-width: 110px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: rgba(10, 132, 255, 0.18);
+    border-right: 1px solid rgba(10, 132, 255, 0.3);
+    color: var(--accent);
+    transition: background 0.3s, color 0.3s, border-color 0.3s;
+  }
+
+  .np-meta {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 0 20px;
+    border-right: 1px solid #3a3a3c;
+  }
+  .np-meta-item { display: flex; flex-direction: column; align-items: center; }
+  .np-meta-val { font-family: var(--font-mono); font-size: 16px; font-weight: 600; color: var(--text); line-height: 1; }
+  .np-meta-val small { font-size: 11px; color: var(--muted); font-weight: 400; margin-left: 2px; }
+  .np-meta-lbl { font-size: 9px; color: var(--muted2); text-transform: uppercase; letter-spacing: 0.1em; margin-top: 1px; }
+
+  #np-chords {
+    flex: 1;
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.25em;
+    color: var(--accent);
+    transition: color 0.3s;
+  }
+
+  #np-next {
+    padding: 0 20px;
+    font-size: 11px;
+    color: var(--muted);
+    border-left: 1px solid #3a3a3c;
+  }
+  #np-next span { color: var(--text); font-weight: 500; }
+
+  /* ── TIMELINE ────────────────────────────────────────────────── */
+  #timeline-wrap {
+    position: relative;
+    height: 104px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    background: #141416;
+    border-bottom: 1px solid #111;
+    flex-shrink: 0;
+    cursor: crosshair;
+    /* custom scrollbar */
+    scrollbar-width: thin;
+    scrollbar-color: #3a3a3c #141416;
+  }
+  #timeline-wrap::-webkit-scrollbar { height: 6px; }
+  #timeline-wrap::-webkit-scrollbar-track { background: #141416; }
+  #timeline-wrap::-webkit-scrollbar-thumb { background: #3a3a3c; border-radius: 3px; }
+
+  /* Bar ruler */
+  #ruler {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 18px;
+    background: #1c1c1e;
+    border-bottom: 1px solid #3a3a3c;
+    pointer-events: none;
+  }
+  .ruler-mark {
+    position: absolute;
+    top: 0;
+    font-size: 9px;
+    color: var(--muted2);
+    padding-left: 3px;
+    line-height: 18px;
+    user-select: none;
+  }
+  .ruler-tick { position: absolute; bottom: 0; width: 1px; background: #3a3a3c; }
+  .ruler-tick.major { height: 8px; background: #5a5a5e; }
+  .ruler-tick.minor { height: 4px; }
+
+  #timeline-inner { position: relative; height: 100%; width: 2520px; }
+
+  .tl-section {
+    position: absolute;
+    top: 22px;
+    height: 70px;
+    border-radius: 5px;
+    padding: 6px 9px;
+    overflow: hidden;
+    /* subtle gradient sheen */
+    background: linear-gradient(180deg, rgba(255,255,255,0.05) 0%, transparent 40%);
+  }
+  .tl-section-name {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-family: var(--font-ui);
+  }
+  .tl-section-bars {
+    font-size: 9px;
+    color: rgba(255,255,255,0.35);
+    margin-top: 3px;
+    font-family: var(--font-ui);
+  }
+  .tl-section-chords {
+    font-size: 10px;
+    color: rgba(255,255,255,0.5);
+    margin-top: 5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: var(--font-mono);
+    letter-spacing: 0.05em;
+  }
+
+  .beat-line { position: absolute; top: 0; bottom: 0; width: 1px; }
+
+  #playhead {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 2px;
+    background: var(--red);
+    box-shadow: 0 0 6px var(--red), 0 0 2px var(--red);
+    z-index: 10;
+  }
+  #playhead::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -5px;
+    width: 0; height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 8px solid var(--red);
+  }
+
+  /* ── EDITOR ──────────────────────────────────────────────────── */
+  #editor {
+    flex: 1;
+    overflow-y: auto;
+    background: var(--bg);
+    scrollbar-width: thin;
+    scrollbar-color: #3a3a3c var(--bg);
+  }
+  #editor::-webkit-scrollbar { width: 6px; }
+  #editor::-webkit-scrollbar-track { background: var(--bg); }
+  #editor::-webkit-scrollbar-thumb { background: #3a3a3c; border-radius: 3px; }
+
+  #editor-inner { padding: 12px 16px; }
+
+  #editor-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-sub);
+  }
+  #editor-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+  }
+
+  .add-btn {
+    display: flex; align-items: center; gap: 5px;
+    padding: 5px 12px;
+    background: var(--accent);
+    border: none;
+    border-radius: 20px;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: var(--font-ui);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .add-btn:hover { background: var(--accent-dim); }
+
+  #sections-list { display: flex; flex-direction: column; gap: 5px; }
+
+  .sec-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border-sub);
+    border-radius: var(--radius);
+    padding: 7px 10px;
+    border-left-width: 3px;
+    transition: background 0.15s;
+  }
+  .sec-row:hover { background: #333335; }
+
+  /* reorder handle */
+  .drag-handle {
+    display: flex; flex-direction: column; gap: 3px;
+    padding: 2px 4px;
+    cursor: grab;
+    opacity: 0.35;
+    flex-shrink: 0;
+  }
+  .drag-handle:hover { opacity: 0.7; }
+  .drag-handle span {
+    display: block; width: 12px; height: 1.5px;
+    background: var(--text);
+    border-radius: 1px;
+  }
+
+  .move-btns {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .move-btn {
+    background: transparent;
+    border: none;
+    color: var(--muted2);
+    cursor: pointer;
+    padding: 1px 3px;
+    font-size: 9px;
+    line-height: 1;
+    border-radius: 3px;
+    transition: background 0.1s, color 0.1s;
+  }
+  .move-btn:hover { background: var(--bg4); color: var(--text); }
+  .move-btn:disabled { opacity: 0.2; pointer-events: none; }
+
+  /* Type badge / selector */
+  .type-select {
+    appearance: none;
+    -webkit-appearance: none;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 24px 4px 10px;
+    width: 112px;
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238e8e93'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    transition: border-color 0.15s;
+  }
+  .type-select:focus { outline: none; border-color: var(--accent); }
+
+  .field-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .field-lbl {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted2);
+    white-space: nowrap;
+  }
+  .number-field {
+    width: 48px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 4px 6px;
+    text-align: center;
+    transition: border-color 0.15s;
+  }
+  .number-field:focus { outline: none; border-color: var(--accent); }
+  .seg-select {
+    appearance: none;
+    -webkit-appearance: none;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: 12px;
+    padding: 4px 22px 4px 8px;
+    width: 62px;
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238e8e93'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 6px center;
+    transition: border-color 0.15s;
+  }
+  .seg-select:focus { outline: none; border-color: var(--accent); }
+
+  .chord-field {
+    flex: 1;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 4px 8px;
+    letter-spacing: 0.05em;
+    transition: border-color 0.15s;
+  }
+  .chord-field:focus { outline: none; border-color: var(--accent); }
+  .chord-field::placeholder { color: var(--muted2); }
+
+  .remove-btn {
+    display: flex; align-items: center; justify-content: center;
+    width: 24px; height: 24px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 50%;
+    color: var(--muted2);
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    flex-shrink: 0;
+  }
+  .remove-btn:hover { background: rgba(255,69,58,0.15); border-color: var(--red); color: var(--red); }
+</style>
+</head>
+<body>
+
+<!-- ── TOOLBAR ─────────────────────────────────────────────────── -->
+<div id="toolbar">
+  <!-- Song name -->
+  <input id="song-title" value="New Song" placeholder="Song Name" />
+
+  <div class="toolbar-divider"></div>
+
+  <!-- Transport controls -->
+  <div id="transport">
+    <!-- Stop -->
+    <button class="transport-btn stop-btn" title="Stop">
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
+        <rect x="0" y="0" width="10" height="10" rx="1"/>
+      </svg>
+    </button>
+    <!-- Play/Pause (active) -->
+    <button class="transport-btn active" title="Play / Pause">
+      <svg width="12" height="13" viewBox="0 0 12 13" fill="currentColor">
+        <path d="M2 1.5l9 5-9 5z"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- LCD Display -->
+  <div id="lcd">
+    <div class="lcd-block">
+      <input id="bpm-input" type="number" value="120" min="20" max="400" title="BPM" />
+      <div class="lcd-label">BPM</div>
+    </div>
+    <div class="lcd-sep"></div>
+    <div class="lcd-block">
+      <div class="lcd-value">3 <span style="font-size:11px;color:var(--muted)">/ 8</span></div>
+      <div class="lcd-label">Bar</div>
+    </div>
+    <div class="lcd-sep"></div>
+    <div class="lcd-block">
+      <div class="lcd-value">2</div>
+      <div class="lcd-label">Beat</div>
+    </div>
+  </div>
+
+  <div class="spacer"></div>
+
+  <!-- Editor toggle -->
+  <button class="pill-btn active" id="editor-toggle">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5">
+      <rect x="1" y="1" width="12" height="3" rx="1"/>
+      <rect x="1" y="5.5" width="12" height="3" rx="1"/>
+      <rect x="1" y="10" width="12" height="3" rx="1"/>
+    </svg>
+    Edit Sections
+  </button>
+</div>
+
+<!-- ── NOW PLAYING ─────────────────────────────────────────────── -->
+<div id="now-playing">
+  <div id="np-section-pill">Verse</div>
+
+  <div class="np-meta">
+    <div class="np-meta-item">
+      <div class="np-meta-val">3 <small>/ 8</small></div>
+      <div class="np-meta-lbl">Bar</div>
+    </div>
+    <div class="np-meta-item">
+      <div class="np-meta-val">2</div>
+      <div class="np-meta-lbl">Beat</div>
+    </div>
+  </div>
+
+  <div id="np-chords">E &nbsp; A &nbsp; E &nbsp; B</div>
+
+  <div id="np-next">Next: <span>Chorus</span></div>
+</div>
+
+<!-- ── TIMELINE ────────────────────────────────────────────────── -->
+<div id="timeline-wrap">
+  <!-- Ruler -->
+  <div id="ruler">
+    <!-- bar numbers at every 160px (4 beats × 40px) -->
+    <div class="ruler-mark" style="left:0px">1</div>
+    <div class="ruler-tick major" style="left:0px;height:8px;"></div>
+    <div class="ruler-mark" style="left:160px">5</div>
+    <div class="ruler-tick major" style="left:160px"></div>
+    <div class="ruler-mark" style="left:320px">9</div>
+    <div class="ruler-tick major" style="left:320px"></div>
+    <div class="ruler-mark" style="left:480px">13</div>
+    <div class="ruler-tick major" style="left:480px"></div>
+    <div class="ruler-mark" style="left:640px">17</div>
+    <div class="ruler-tick major" style="left:640px"></div>
+    <div class="ruler-mark" style="left:800px">21</div>
+    <div class="ruler-tick major" style="left:800px"></div>
+    <div class="ruler-mark" style="left:960px">25</div>
+    <div class="ruler-tick major" style="left:960px"></div>
+    <!-- minor ticks every 40px (1 beat) -->
+    <div class="ruler-tick minor" style="left:40px"></div>
+    <div class="ruler-tick minor" style="left:80px"></div>
+    <div class="ruler-tick minor" style="left:120px"></div>
+    <div class="ruler-tick minor" style="left:200px"></div>
+    <div class="ruler-tick minor" style="left:240px"></div>
+    <div class="ruler-tick minor" style="left:280px"></div>
+    <div class="ruler-tick minor" style="left:360px"></div>
+    <div class="ruler-tick minor" style="left:400px"></div>
+    <div class="ruler-tick minor" style="left:440px"></div>
+  </div>
+
+  <div id="timeline-inner">
+    <!-- Intro: 4 bars → 160px -->
+    <div class="tl-section" style="left:0px; width:158px; background:rgba(48,209,88,0.13); border:1px solid rgba(48,209,88,0.35); border-top:2px solid #30d158;">
+      <div class="tl-section-name" style="color:#30d158">Intro</div>
+      <div class="tl-section-bars">4 bars · 4/4</div>
+      <div class="tl-section-chords">E  A  B  A</div>
+    </div>
+
+    <!-- Verse: 8 bars → 320px (active) -->
+    <div class="tl-section" style="left:160px; width:318px; background:rgba(10,132,255,0.18); border:1px solid rgba(10,132,255,0.5); border-top:2px solid #0a84ff;">
+      <div class="tl-section-name" style="color:#0a84ff">Verse</div>
+      <div class="tl-section-bars">8 bars · 4/4</div>
+      <div class="tl-section-chords">E  A  E  B</div>
+    </div>
+
+    <!-- Chorus: 8 bars -->
+    <div class="tl-section" style="left:480px; width:318px; background:rgba(255,69,58,0.12); border:1px solid rgba(255,69,58,0.3); border-top:2px solid #ff453a;">
+      <div class="tl-section-name" style="color:#ff453a">Chorus</div>
+      <div class="tl-section-bars">8 bars · 4/4</div>
+      <div class="tl-section-chords">A  E  B  A</div>
+    </div>
+
+    <!-- Verse 2 -->
+    <div class="tl-section" style="left:800px; width:318px; background:rgba(10,132,255,0.08); border:1px solid rgba(10,132,255,0.2); border-top:2px solid #0a84ff;">
+      <div class="tl-section-name" style="color:#0a84ff">Verse</div>
+      <div class="tl-section-bars">8 bars · 4/4</div>
+      <div class="tl-section-chords">E  A  E  B</div>
+    </div>
+
+    <!-- Chorus 2 -->
+    <div class="tl-section" style="left:1120px; width:318px; background:rgba(255,69,58,0.12); border:1px solid rgba(255,69,58,0.3); border-top:2px solid #ff453a;">
+      <div class="tl-section-name" style="color:#ff453a">Chorus</div>
+      <div class="tl-section-bars">8 bars · 4/4</div>
+      <div class="tl-section-chords">A  E  B  A</div>
+    </div>
+
+    <!-- Bridge: 4 bars -->
+    <div class="tl-section" style="left:1440px; width:158px; background:rgba(255,159,10,0.12); border:1px solid rgba(255,159,10,0.3); border-top:2px solid #ff9f0a;">
+      <div class="tl-section-name" style="color:#ff9f0a">Bridge</div>
+      <div class="tl-section-bars">4 bars · 4/4</div>
+      <div class="tl-section-chords">C#m  A  B  B</div>
+    </div>
+
+    <!-- Solo: 8 bars -->
+    <div class="tl-section" style="left:1600px; width:318px; background:rgba(90,200,250,0.12); border:1px solid rgba(90,200,250,0.3); border-top:2px solid #5ac8fa;">
+      <div class="tl-section-name" style="color:#5ac8fa">Solo</div>
+      <div class="tl-section-bars">8 bars · 4/4</div>
+      <div class="tl-section-chords">E  A  E  B</div>
+    </div>
+
+    <!-- Chorus 3 -->
+    <div class="tl-section" style="left:1920px; width:318px; background:rgba(255,69,58,0.12); border:1px solid rgba(255,69,58,0.3); border-top:2px solid #ff453a;">
+      <div class="tl-section-name" style="color:#ff453a">Chorus</div>
+      <div class="tl-section-bars">8 bars · 4/4</div>
+      <div class="tl-section-chords">A  E  B  A</div>
+    </div>
+
+    <!-- Outro: 4 bars -->
+    <div class="tl-section" style="left:2240px; width:158px; background:rgba(255,214,10,0.10); border:1px solid rgba(255,214,10,0.25); border-top:2px solid #ffd60a;">
+      <div class="tl-section-name" style="color:#ffd60a">Outro</div>
+      <div class="tl-section-bars">4 bars · 4/4</div>
+      <div class="tl-section-chords">E  E  E  E</div>
+    </div>
+
+    <!-- Playhead (mid-Verse, beat 3 of bar 3 → 160 + 2*160 + 2*40 = 560px… simplified for mockup) -->
+    <div id="playhead" style="left:328px;"></div>
+  </div>
+</div>
+
+<!-- ── EDITOR ──────────────────────────────────────────────────── -->
+<div id="editor">
+  <div id="editor-inner">
+    <div id="editor-header">
+      <span id="editor-title">Song Sections</span>
+      <button class="add-btn">
+        <svg width="11" height="11" viewBox="0 0 11 11" fill="currentColor">
+          <path d="M5.5 0v11M0 5.5h11" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+        Add Section
+      </button>
+    </div>
+
+    <div id="sections-list">
+
+      <!-- Intro -->
+      <div class="sec-row" style="border-left-color:#30d158;">
+        <div class="drag-handle"><span></span><span></span><span></span></div>
+        <div class="move-btns">
+          <button class="move-btn" disabled>▲</button>
+          <button class="move-btn">▼</button>
+        </div>
+        <select class="type-select" style="color:#30d158; border-color:rgba(48,209,88,0.4);">
+          <option selected>Intro</option><option>Verse</option><option>Pre-Chorus</option>
+          <option>Chorus</option><option>Bridge</option><option>Solo</option><option>Outro</option><option>Break</option>
+        </select>
+        <div class="field-group">
+          <span class="field-lbl">Bars</span>
+          <input type="number" class="number-field" value="4" min="1" max="64" />
+        </div>
+        <div class="field-group">
+          <span class="field-lbl">Time</span>
+          <select class="seg-select"><option>4/4</option><option>3/4</option><option>6/8</option></select>
+        </div>
+        <div class="field-group" style="flex:1;">
+          <span class="field-lbl">Chords</span>
+          <input type="text" class="chord-field" value="E  A  B  A" placeholder="E  A  B  A" />
+        </div>
+        <button class="remove-btn">✕</button>
+      </div>
+
+      <!-- Verse (highlighted / active) -->
+      <div class="sec-row" style="border-left-color:#0a84ff; background:#2a2a3c;">
+        <div class="drag-handle"><span></span><span></span><span></span></div>
+        <div class="move-btns">
+          <button class="move-btn">▲</button>
+          <button class="move-btn">▼</button>
+        </div>
+        <select class="type-select" style="color:#0a84ff; border-color:rgba(10,132,255,0.5);">
+          <option>Intro</option><option selected>Verse</option><option>Pre-Chorus</option>
+          <option>Chorus</option><option>Bridge</option><option>Solo</option><option>Outro</option><option>Break</option>
+        </select>
+        <div class="field-group">
+          <span class="field-lbl">Bars</span>
+          <input type="number" class="number-field" value="8" min="1" max="64" style="border-color:var(--accent);" />
+        </div>
+        <div class="field-group">
+          <span class="field-lbl">Time</span>
+          <select class="seg-select"><option>4/4</option></select>
+        </div>
+        <div class="field-group" style="flex:1;">
+          <span class="field-lbl">Chords</span>
+          <input type="text" class="chord-field" value="E  A  E  B" style="border-color:var(--accent);" />
+        </div>
+        <button class="remove-btn">✕</button>
+      </div>
+
+      <!-- Chorus -->
+      <div class="sec-row" style="border-left-color:#ff453a;">
+        <div class="drag-handle"><span></span><span></span><span></span></div>
+        <div class="move-btns">
+          <button class="move-btn">▲</button>
+          <button class="move-btn">▼</button>
+        </div>
+        <select class="type-select" style="color:#ff453a; border-color:rgba(255,69,58,0.4);">
+          <option>Intro</option><option>Verse</option><option>Pre-Chorus</option>
+          <option selected>Chorus</option><option>Bridge</option><option>Solo</option><option>Outro</option><option>Break</option>
+        </select>
+        <div class="field-group">
+          <span class="field-lbl">Bars</span>
+          <input type="number" class="number-field" value="8" min="1" max="64" />
+        </div>
+        <div class="field-group">
+          <span class="field-lbl">Time</span>
+          <select class="seg-select"><option>4/4</option></select>
+        </div>
+        <div class="field-group" style="flex:1;">
+          <span class="field-lbl">Chords</span>
+          <input type="text" class="chord-field" value="A  E  B  A" />
+        </div>
+        <button class="remove-btn">✕</button>
+      </div>
+
+      <div style="color:var(--muted2);font-size:11px;padding:6px 4px;font-style:italic;text-align:center;">+ 6 more sections</div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
