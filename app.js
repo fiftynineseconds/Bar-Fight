@@ -1028,6 +1028,62 @@ document.getElementById('bpm-input').oninput = (event) => {
   }
 };
 
+// --- Tap tempo ---
+const tapTimes = [];
+let tapResetTimer = null;
+const TAP_RESET_MS = 2000; // reset if no tap for 2 s
+
+function applyTapTempo() {
+  if (tapTimes.length < 2) return;
+  const intervals = [];
+  for (let i = 1; i < tapTimes.length; i++) {
+    intervals.push(tapTimes[i] - tapTimes[i - 1]);
+  }
+  const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+  const newBpm = Math.max(20, Math.min(400, Math.round(60000 / avgInterval)));
+  song.bpm = newBpm;
+  document.getElementById('bpm-input').value = String(newBpm);
+  currentBeat = clampBeat(currentBeat);
+  refresh();
+  if (playing) { pause(); play(); }
+}
+
+function onTap() {
+  const now = Date.now();
+  const tapBtn = document.getElementById('tap-btn');
+
+  if (tapResetTimer !== null) {
+    clearTimeout(tapResetTimer);
+  }
+
+  // Reset if gap is too long
+  if (tapTimes.length > 0 && now - tapTimes[tapTimes.length - 1] > TAP_RESET_MS) {
+    tapTimes.length = 0;
+  }
+
+  tapTimes.push(now);
+  tapBtn.classList.add('tapping');
+  applyTapTempo();
+
+  tapResetTimer = setTimeout(() => {
+    tapTimes.length = 0;
+    tapBtn.classList.remove('tapping');
+    tapResetTimer = null;
+  }, TAP_RESET_MS);
+}
+
+document.getElementById('tap-btn').onclick = onTap;
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 't' || event.key === 'T') {
+    const active = document.activeElement;
+    const tag = active ? active.tagName : '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    event.preventDefault();
+    onTap();
+  }
+});
+
 document.getElementById('song-title').oninput = (event) => {
   song.title = event.target.value;
 };

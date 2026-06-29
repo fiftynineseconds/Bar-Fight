@@ -28,12 +28,8 @@ Future plans:
 
 ## TODO:
 
-- [ ] Add tap tempo
 - [ ] Optimize for iPad
 - [ ] It should have some kind of flashing button or something that is an indicator of the tempo, and be switchable between on and off. It could even play a click and have that be a toggle.
-- [ ] Underneath the scrolling area should be a new feature that shows you all of the upcoming parts of the song in a quick view.
-- [ ] Set tempo by listening to the song through mic.
-- [ ] Time Signature
 
 ## Docker Setup
 

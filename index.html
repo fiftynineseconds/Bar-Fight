@@ -102,6 +102,15 @@
     }
     #detect-bpm-btn:hover { background: var(--bg4); }
     #detect-bpm-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    #tap-btn {
+      background: var(--bg3); border: 1px solid var(--border-hi); border-radius: 999px;
+      color: var(--text2); font-size: 13px; font-weight: 700; font-family: var(--font-ui);
+      padding: 9px 16px; cursor: pointer; white-space: nowrap; letter-spacing: 0.04em;
+      transition: background 0.08s, transform 0.08s, box-shadow 0.08s;
+    }
+    #tap-btn:hover { background: var(--bg4); }
+    #tap-btn:active { transform: scale(0.94); box-shadow: none; }
+    #tap-btn.tapping { border-color: var(--amber); color: var(--amber); background: rgba(245,158,11,0.1); }
     #bpm-detect-result {
       min-width: 160px; max-width: 250px; white-space: nowrap;
       overflow: hidden; text-overflow: ellipsis;
@@ -323,6 +332,7 @@
         <input id="bpm-input" type="number" value="120" min="20" max="400" />
         <div class="bpm-label">BPM</div>
       </div>
+      <button id="tap-btn" title="Tap to set BPM (T)">Tap</button>
       <div id="progress-wrap">
         <div id="progress-track"><div id="progress-fill"></div></div>
         <div id="progress-label">Bar 1 / 1 · 0:00 / 0:00</div>
