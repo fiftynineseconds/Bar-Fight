@@ -11,6 +11,7 @@
 - Hit play — a beat-locked playhead scrolls across the timeline in real time
 - A header bar shows the current section, bar number, beat, and chords at a glance, with a "Next: [section]" preview
 - Click anywhere on the timeline to seek
+- Save songs to a JSON file and load them back from disk
 
 ## Stack & Structure
 

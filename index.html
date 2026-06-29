@@ -77,6 +77,14 @@
     }
     #editor-toggle:hover { background: var(--bg4); }
     #editor-toggle.active { background: rgba(245,158,11,0.15); border-color: var(--amber); color: var(--amber); }
+    #song-file-actions { display: flex; align-items: center; gap: 6px; }
+    .song-file-btn {
+      display: flex; align-items: center; gap: 6px; padding: 8px 12px;
+      background: var(--bg3); border: 1px solid var(--border-hi); border-radius: 999px;
+      color: var(--text2); font-size: 13px; font-weight: 600; font-family: var(--font-ui);
+      cursor: pointer; white-space: nowrap;
+    }
+    .song-file-btn:hover { background: var(--bg4); }
     #now-playing {
       display: flex; align-items: stretch; flex-shrink: 0; height: 84px; border-bottom: 1px solid var(--border);
       overflow: hidden; transition: background 0.4s; background: var(--bg2);
@@ -270,6 +278,11 @@
       <div id="progress-wrap">
         <div id="progress-track"><div id="progress-fill"></div></div>
         <div id="progress-label">Bar 1 / 1 · 0:00 / 0:00</div>
+      </div>
+      <div id="song-file-actions">
+        <button id="save-song-btn" class="song-file-btn" title="Download this song as JSON">Save Song</button>
+        <button id="load-song-btn" class="song-file-btn" title="Load a song JSON file">Load Song</button>
+        <input id="load-song-input" type="file" accept="application/json,.json" hidden />
       </div>
       <div class="spacer"></div>
       <button id="editor-toggle" class="active" title="Show or hide section editor">

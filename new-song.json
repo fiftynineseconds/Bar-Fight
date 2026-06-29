@@ -1,0 +1,69 @@
+{
+  "title": "New Song",
+  "bpm": 120,
+  "sections": [
+    {
+      "id": 1,
+      "type": "Intro",
+      "bars": 4,
+      "bpb": 4,
+      "chords": "E  A  B  A"
+    },
+    {
+      "id": 2,
+      "type": "Verse",
+      "bars": 8,
+      "bpb": 4,
+      "chords": "E  A  E  B"
+    },
+    {
+      "id": 3,
+      "type": "Chorus",
+      "bars": 8,
+      "bpb": 4,
+      "chords": "A  E  B  A"
+    },
+    {
+      "id": 4,
+      "type": "Verse",
+      "bars": 8,
+      "bpb": 4,
+      "chords": "E  A  E  B"
+    },
+    {
+      "id": 5,
+      "type": "Chorus",
+      "bars": 8,
+      "bpb": 4,
+      "chords": "A  E  B  A"
+    },
+    {
+      "id": 6,
+      "type": "Bridge",
+      "bars": 4,
+      "bpb": 4,
+      "chords": "C#m  A  B  B"
+    },
+    {
+      "id": 7,
+      "type": "Solo",
+      "bars": 8,
+      "bpb": 4,
+      "chords": "E  A  E  B"
+    },
+    {
+      "id": 8,
+      "type": "Chorus",
+      "bars": 8,
+      "bpb": 4,
+      "chords": "A  E  B  A"
+    },
+    {
+      "id": 9,
+      "type": "Outro",
+      "bars": 4,
+      "bpb": 4,
+      "chords": "E  E  E  E"
+    }
+  ]
+}

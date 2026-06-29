@@ -38,6 +38,100 @@ let startTime = null;
 let startBeat = 0;
 let rafId = null;
 
+function syncSongInputs() {
+  const titleInput = document.getElementById('song-title');
+  const bpmInput = document.getElementById('bpm-input');
+  titleInput.value = song.title;
+  bpmInput.value = String(song.bpm);
+}
+
+function sanitizeSong(rawSong) {
+  if (!rawSong || typeof rawSong !== 'object') {
+    throw new Error('Song file must contain a JSON object.');
+  }
+
+  if (!Array.isArray(rawSong.sections) || rawSong.sections.length === 0) {
+    throw new Error('Song file must include at least one section.');
+  }
+
+  const title = String(rawSong.title || '').trim() || 'Untitled Song';
+  const bpm = Math.max(20, Math.min(400, parseInt(rawSong.bpm, 10) || 120));
+  const usedIds = new Set();
+
+  const sections = rawSong.sections.map((section, index) => {
+    if (!section || typeof section !== 'object') {
+      throw new Error(`Section ${index + 1} is invalid.`);
+    }
+
+    if (!TYPES.includes(section.type)) {
+      throw new Error(`Section ${index + 1} has an unsupported type: ${section.type}`);
+    }
+
+    const bars = parseInt(section.bars, 10);
+    if (!Number.isInteger(bars) || bars < 1) {
+      throw new Error(`Section ${index + 1} has an invalid bar count.`);
+    }
+
+    const bpb = parseInt(section.bpb, 10);
+    if (!Number.isInteger(bpb) || bpb < 2 || bpb > 8) {
+      throw new Error(`Section ${index + 1} has an invalid time signature.`);
+    }
+
+    let id = Number(section.id);
+    if (!Number.isInteger(id) || id < 1 || usedIds.has(id)) {
+      id = index + 1;
+      while (usedIds.has(id)) {
+        id += 1;
+      }
+    }
+    usedIds.add(id);
+
+    return {
+      id,
+      type: section.type,
+      bars,
+      bpb,
+      chords: section.chords ? String(section.chords) : '',
+    };
+  });
+
+  return { title, bpm, sections };
+}
+
+function loadSongFromData(rawSong) {
+  const nextSong = sanitizeSong(rawSong);
+  pause();
+  currentBeat = 0;
+  startBeat = 0;
+  startTime = null;
+  song = nextSong;
+  nextId = song.sections.reduce((maxId, section) => Math.max(maxId, section.id), 0) + 1;
+  syncSongInputs();
+  refresh();
+}
+
+function buildSaveFileName() {
+  const cleanedTitle = song.title
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return `${cleanedTitle || 'song'}.json`;
+}
+
+function saveSongToDisk() {
+  const json = JSON.stringify(song, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = buildSaveFileName();
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+}
+
 function totalBeats() {
   return song.sections.reduce((sum, sec) => sum + sec.bars * sec.bpb, 0);
 }
@@ -498,6 +592,38 @@ document.getElementById('song-title').oninput = (event) => {
   song.title = event.target.value;
 };
 
+document.getElementById('save-song-btn').onclick = saveSongToDisk;
+
+document.getElementById('load-song-btn').onclick = () => {
+  const loadInput = document.getElementById('load-song-input');
+  loadInput.value = '';
+  loadInput.click();
+};
+
+document.getElementById('load-song-input').onchange = async (event) => {
+  const file = event.target.files && event.target.files[0];
+  if (!file) {
+    return;
+  }
+
+  const text = await file.text();
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch (error) {
+    window.alert('Could not parse that file. Please select a valid song JSON file.');
+    console.error(error);
+    return;
+  }
+
+  try {
+    loadSongFromData(parsed);
+  } catch (error) {
+    window.alert(error.message);
+    console.error(error);
+  }
+};
+
 document.getElementById('editor-toggle').onclick = () => {
   const editor = document.getElementById('editor');
   const hidden = editor.classList.toggle('hidden');
@@ -521,4 +647,5 @@ document.getElementById('timeline-wrap').onclick = (event) => {
 };
 
 setPlayButtonState();
+syncSongInputs();
 refresh();
