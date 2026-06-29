@@ -12,13 +12,6 @@
 - A header bar shows the current section, bar number, beat, and chords at a glance, with a "Next: [section]" preview
 - Click anywhere on the timeline to seek
 
-## Design
-
-- Dark DAW-inspired UI — think Pro Tools, not a music app
-- Monospace font throughout
-- Each section type has its own accent color; active section glows
-- Single HTML file + vanilla JS, no framework, no build step
-
 ## Stack & Structure
 
 Currently: a single `index.html` served by nginx in Docker.
@@ -33,10 +26,10 @@ Future plans:
 
 - [ ] Add tap tempo
 - [ ] Optimize for iPad
-- [ ] Keep a `HISTORY.md` file — log all features and changes as a running quick log
 - [ ] It should have some kind of flashing button or something that is an indicator of the tempo, and be switchable between on and off. It could even play a click and have that be a toggle.
 - [ ] Underneath the scrolling area should be a new feature that shows you all of the upcoming parts of the song in a quick view.
 - [ ] Set tempo by listening to the song through mic.
+- [ ] Time Signature
 
 ## Docker Setup
 
