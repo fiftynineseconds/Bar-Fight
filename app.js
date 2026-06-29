@@ -16,19 +16,22 @@ const COLORS = {
 };
 const TYPES = Object.keys(COLORS);
 
+// Quarter-note beats per bar — the unit all timing math works in (BPM = quarter notes/min)
+function secQpb(sec) { return sec.bpb * 4 / sec.den; }
+
 let song = {
   title: 'New Song',
   bpm: 120,
   sections: [
-    { id: 1, type: 'Intro', bars: 4, bpb: 4, chords: 'E  A  B  A' },
-    { id: 2, type: 'Verse', bars: 8, bpb: 4, chords: 'E  A  E  B' },
-    { id: 3, type: 'Chorus', bars: 8, bpb: 4, chords: 'A  E  B  A' },
-    { id: 4, type: 'Verse', bars: 8, bpb: 4, chords: 'E  A  E  B' },
-    { id: 5, type: 'Chorus', bars: 8, bpb: 4, chords: 'A  E  B  A' },
-    { id: 6, type: 'Bridge', bars: 4, bpb: 4, chords: 'C#m  A  B  B' },
-    { id: 7, type: 'Solo', bars: 8, bpb: 4, chords: 'E  A  E  B' },
-    { id: 8, type: 'Chorus', bars: 8, bpb: 4, chords: 'A  E  B  A' },
-    { id: 9, type: 'Outro', bars: 4, bpb: 4, chords: 'E  E  E  E' },
+    { id: 1, type: 'Intro', bars: 4, bpb: 4, den: 4, chords: 'E  A  B  A' },
+    { id: 2, type: 'Verse', bars: 8, bpb: 4, den: 4, chords: 'E  A  E  B' },
+    { id: 3, type: 'Chorus', bars: 8, bpb: 4, den: 4, chords: 'A  E  B  A' },
+    { id: 4, type: 'Verse', bars: 8, bpb: 4, den: 4, chords: 'E  A  E  B' },
+    { id: 5, type: 'Chorus', bars: 8, bpb: 4, den: 4, chords: 'A  E  B  A' },
+    { id: 6, type: 'Bridge', bars: 4, bpb: 4, den: 4, chords: 'C#m  A  B  B' },
+    { id: 7, type: 'Solo', bars: 8, bpb: 4, den: 4, chords: 'E  A  E  B' },
+    { id: 8, type: 'Chorus', bars: 8, bpb: 4, den: 4, chords: 'A  E  B  A' },
+    { id: 9, type: 'Outro', bars: 4, bpb: 4, den: 4, chords: 'E  E  E  E' },
   ],
 };
 
@@ -356,9 +359,12 @@ function sanitizeSong(rawSong) {
     }
 
     const bpb = parseInt(section.bpb, 10);
-    if (!Number.isInteger(bpb) || bpb < 2 || bpb > 8) {
-      throw new Error(`Section ${index + 1} has an invalid time signature.`);
+    if (!Number.isInteger(bpb) || bpb < 1 || bpb > 16) {
+      throw new Error(`Section ${index + 1} has an invalid time signature numerator.`);
     }
+
+    const rawDen = parseInt(section.den, 10);
+    const den = [2, 4, 8, 16].includes(rawDen) ? rawDen : 4;
 
     let id = Number(section.id);
     if (!Number.isInteger(id) || id < 1 || usedIds.has(id)) {
@@ -374,6 +380,7 @@ function sanitizeSong(rawSong) {
       type: section.type,
       bars,
       bpb,
+      den,
       chords: section.chords ? String(section.chords) : '',
     };
   });
@@ -437,7 +444,7 @@ function saveSongToDisk() {
 }
 
 function totalBeats() {
-  return song.sections.reduce((sum, sec) => sum + sec.bars * sec.bpb, 0);
+  return song.sections.reduce((sum, sec) => sum + sec.bars * secQpb(sec), 0);
 }
 
 function totalBars() {
@@ -476,7 +483,7 @@ function getSectionAt(beat) {
   let acc = 0;
   for (let i = 0; i < song.sections.length; i += 1) {
     const sec = song.sections[i];
-    const secBeats = sec.bars * sec.bpb;
+    const secBeats = sec.bars * secQpb(sec);
     if (beat < acc + secBeats) {
       return { sec, idx: i, beatInSec: beat - acc, secStart: acc };
     }
@@ -491,9 +498,9 @@ function getSongBarNumber(beat) {
   let accBars = 0;
   for (let i = 0; i < song.sections.length; i += 1) {
     const sec = song.sections[i];
-    const secBeats = sec.bars * sec.bpb;
+    const secBeats = sec.bars * secQpb(sec);
     if (clamped < accBeats + secBeats || i === song.sections.length - 1) {
-      return accBars + Math.floor((clamped - accBeats) / sec.bpb) + 1;
+      return accBars + Math.floor((clamped - accBeats) / secQpb(sec)) + 1;
     }
     accBeats += secBeats;
     accBars += sec.bars;
@@ -608,8 +615,8 @@ function updatePlayhead() {
 
   const info = getSectionAt(beat);
   if (info) {
-    const bar = Math.floor(info.beatInSec / info.sec.bpb) + 1;
-    const beatInBar = Math.floor(info.beatInSec % info.sec.bpb) + 1;
+    const bar = Math.floor(info.beatInSec / secQpb(info.sec)) + 1;
+    const beatInBar = Math.floor(info.beatInSec % secQpb(info.sec)) + 1;
     label.textContent = `${bar}.${beatInBar}`;
   } else {
     label.textContent = '—';
@@ -657,8 +664,8 @@ function updateNowPlaying() {
 
   const { sec, idx, beatInSec } = info;
   const color = COLORS[sec.type];
-  const bar = Math.floor(beatInSec / sec.bpb) + 1;
-  const beatInBar = Math.floor(beatInSec % sec.bpb) + 1;
+  const bar = Math.floor(beatInSec / secQpb(sec)) + 1;
+  const beatInBar = Math.floor(beatInSec % secQpb(sec)) + 1;
   const nextSec = song.sections[idx + 1];
 
   npSectionSlab.style.background = color.fill;
@@ -777,7 +784,7 @@ function renderTimeline() {
   let acc = 0;
   song.sections.forEach((sec) => {
     const color = COLORS[sec.type];
-    const width = bpx(sec.bars * sec.bpb);
+    const width = bpx(sec.bars * secQpb(sec));
     const sectionStart = acc;
     const block = document.createElement('div');
     block.className = 'tl-section inactive';
@@ -787,7 +794,7 @@ function renderTimeline() {
     block.style.background = color.fill;
     block.innerHTML = `
       <div class="tl-section-name" style="color:${color.text}">${sec.type}</div>
-      <div class="tl-section-bars" style="color:${color.text}">${sec.bars} bars · ${sec.bpb}/4</div>
+      <div class="tl-section-bars" style="color:${color.text}">${sec.bars} bars · ${sec.bpb}/${sec.den}</div>
       <div class="tl-section-chords" style="color:${color.text}">${sec.chords || '—'}</div>
     `;
     block.onclick = (event) => {
@@ -795,7 +802,7 @@ function renderTimeline() {
       seekToBeat(sectionStart);
     };
     inner.appendChild(block);
-    acc += sec.bars * sec.bpb;
+    acc += sec.bars * secQpb(sec);
   });
 
   if (loadedAudioDurationSec > 0) {
@@ -841,7 +848,7 @@ function renderSidebar() {
     const sectionStart = acc;
     chip.onclick = () => seekToBeat(sectionStart);
     list.appendChild(chip);
-    acc += sec.bars * sec.bpb;
+    acc += sec.bars * secQpb(sec);
   });
 }
 
@@ -910,20 +917,42 @@ function renderEditor() {
     const timeGroup = document.createElement('div');
     timeGroup.className = 'f-grp';
     timeGroup.innerHTML = '<span class="f-lbl">Time</span>';
-    const timeSel = document.createElement('select');
-    timeSel.className = 'time-sel';
-    [2, 3, 4, 5, 6, 7, 8].forEach((beatsPerBar) => {
+
+    const numSel = document.createElement('select');
+    numSel.className = 'time-sel';
+    [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].forEach((n) => {
       const option = document.createElement('option');
-      option.value = String(beatsPerBar);
-      option.textContent = `${beatsPerBar}/4`;
-      option.selected = beatsPerBar === sec.bpb;
-      timeSel.appendChild(option);
+      option.value = String(n);
+      option.textContent = String(n);
+      option.selected = n === sec.bpb;
+      numSel.appendChild(option);
     });
-    timeSel.onchange = () => {
-      sec.bpb = parseInt(timeSel.value, 10);
+
+    const timeSep = document.createElement('span');
+    timeSep.className = 'time-sep';
+    timeSep.textContent = '/';
+
+    const denSel = document.createElement('select');
+    denSel.className = 'time-sel';
+    [2, 4, 8, 16].forEach((d) => {
+      const option = document.createElement('option');
+      option.value = String(d);
+      option.textContent = String(d);
+      option.selected = d === sec.den;
+      denSel.appendChild(option);
+    });
+
+    const onTimeSigChange = () => {
+      sec.bpb = parseInt(numSel.value, 10);
+      sec.den = parseInt(denSel.value, 10);
       refresh();
     };
-    timeGroup.appendChild(timeSel);
+    numSel.onchange = onTimeSigChange;
+    denSel.onchange = onTimeSigChange;
+
+    timeGroup.appendChild(numSel);
+    timeGroup.appendChild(timeSep);
+    timeGroup.appendChild(denSel);
     row.appendChild(timeGroup);
 
     const chordGroup = document.createElement('div');
@@ -1065,7 +1094,7 @@ document.getElementById('editor-toggle').onclick = () => {
 };
 
 function addSection() {
-  song.sections.push({ id: nextId, type: 'Verse', bars: 4, bpb: 4, chords: '' });
+  song.sections.push({ id: nextId, type: 'Verse', bars: 4, bpb: 4, den: 4, chords: '' });
   nextId += 1;
   refresh();
 }
