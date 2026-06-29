@@ -209,9 +209,27 @@
     .tl-section {
       position: absolute; top: 40px; height: 194px; border-radius: 12px; padding: 16px; overflow: hidden;
       cursor: pointer; transition: filter 0.15s, transform 0.15s; border: 1px solid rgba(255,235,185,0.22);
-      z-index: 3;
+      z-index: 3; user-select: none;
     }
     .tl-section:hover { filter: brightness(1.15); transform: translateY(-1px); }
+    .tl-section.dragging {
+      filter: brightness(1.2);
+      box-shadow: 0 10px 28px rgba(0,0,0,0.28), inset 0 0 0 1px rgba(255,255,255,0.18);
+      cursor: grabbing;
+    }
+    .tl-section-body { position: relative; z-index: 1; }
+    .tl-section-handle {
+      position: absolute; top: 0; bottom: 0; width: 12px; z-index: 2; opacity: 0;
+      transition: opacity 0.12s; cursor: ew-resize;
+      background: linear-gradient(to right, rgba(255,255,255,0.24), rgba(255,255,255,0));
+    }
+    .tl-section-handle.right {
+      right: 0;
+      background: linear-gradient(to left, rgba(255,255,255,0.24), rgba(255,255,255,0));
+    }
+    .tl-section-handle.left { left: 0; }
+    .tl-section:hover .tl-section-handle,
+    .tl-section.dragging .tl-section-handle { opacity: 0.95; }
     .tl-section-name { font-size: 19px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; font-family: var(--font-ui); opacity: 0.95; }
     .tl-section-bars { font-size: 14px; opacity: 0.55; margin-top: 8px; font-family: var(--font-ui); font-weight: 500; }
     .tl-section-chords {

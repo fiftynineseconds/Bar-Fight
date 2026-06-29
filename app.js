@@ -51,6 +51,8 @@ let waveformPeaks = null;
 let waveformVersion = 0;
 let audioStartOffsetSec = 0;
 let draggingSongStart = false;
+let sectionInteraction = null;
+let suppressTimelineClick = false;
 let loadedAudioBuffer = null;
 let detectingBpm = false;
 let expectedAudioFileName = '';
@@ -447,6 +449,131 @@ function totalBeats() {
   return song.sections.reduce((sum, sec) => sum + sec.bars * secQpb(sec), 0);
 }
 
+function getSectionIndexById(sectionId) {
+  return song.sections.findIndex((sec) => sec.id === sectionId);
+}
+
+function getSectionStartBeatByIndex(index) {
+  let acc = 0;
+  for (let i = 0; i < index; i += 1) {
+    acc += song.sections[i].bars * secQpb(song.sections[i]);
+  }
+  return acc;
+}
+
+function clientXToTimelineBeat(clientX) {
+  const wrap = document.getElementById('timeline-wrap');
+  const rect = wrap.getBoundingClientRect();
+  const x = clientX - rect.left + wrap.scrollLeft;
+  return (x / PX_PER_BEAT) - timelineLeadInBeats();
+}
+
+function moveSectionToIndex(fromIndex, toIndex) {
+  if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= song.sections.length || toIndex >= song.sections.length) {
+    return;
+  }
+  const [moved] = song.sections.splice(fromIndex, 1);
+  song.sections.splice(toIndex, 0, moved);
+}
+
+function beginSectionMove(event, sectionId) {
+  const index = getSectionIndexById(sectionId);
+  if (index < 0) {
+    return;
+  }
+  sectionInteraction = {
+    mode: 'move',
+    sectionId,
+    startClientX: event.clientX,
+  };
+  document.body.style.cursor = 'grabbing';
+  refresh();
+}
+
+function beginSectionResize(event, sectionId, side) {
+  const index = getSectionIndexById(sectionId);
+  if (index < 0) {
+    return;
+  }
+
+  const targetIndex = side === 'left' ? index - 1 : index;
+  if (targetIndex < 0 || targetIndex >= song.sections.length) {
+    return;
+  }
+
+  const targetSection = song.sections[targetIndex];
+  const boundaryBeat = getSectionStartBeatByIndex(side === 'left' ? index : index + 1);
+  sectionInteraction = {
+    mode: side === 'left' ? 'resize-left' : 'resize-right',
+    sectionId,
+    startClientX: event.clientX,
+    targetIndex,
+    startBars: targetSection.bars,
+    boundaryBeat,
+    beatsPerBar: secQpb(targetSection),
+  };
+  document.body.style.cursor = 'ew-resize';
+  refresh();
+}
+
+function updateSectionMove(clientX) {
+  const { sectionId } = sectionInteraction;
+  const currentIndex = getSectionIndexById(sectionId);
+  if (currentIndex < 0) {
+    return;
+  }
+  const pointerBeat = clientXToTimelineBeat(clientX);
+
+  let acc = 0;
+  const others = song.sections
+    .map((sec, index) => {
+      const start = acc;
+      const beats = sec.bars * secQpb(sec);
+      acc += beats;
+      return { sec, index, mid: start + (beats / 2) };
+    })
+    .filter((entry) => entry.sec.id !== sectionId);
+
+  let nextIndex = 0;
+  others.forEach((entry) => {
+    if (pointerBeat > entry.mid) {
+      nextIndex += 1;
+    }
+  });
+
+  if (nextIndex !== currentIndex) {
+    moveSectionToIndex(currentIndex, nextIndex);
+    currentBeat = clampBeat(currentBeat);
+    refresh();
+  }
+}
+
+function updateSectionResize(clientX) {
+  const { targetIndex, startBars, boundaryBeat, beatsPerBar } = sectionInteraction;
+  const targetSection = song.sections[targetIndex];
+  if (!targetSection) {
+    return;
+  }
+
+  const pointerBeat = clientXToTimelineBeat(clientX);
+  const deltaBars = Math.round((pointerBeat - boundaryBeat) / beatsPerBar);
+  const nextBars = Math.max(1, Math.min(64, startBars + deltaBars));
+  if (nextBars !== targetSection.bars) {
+    targetSection.bars = nextBars;
+    currentBeat = clampBeat(currentBeat);
+    refresh();
+  }
+}
+
+function endSectionInteraction() {
+  if (!sectionInteraction) {
+    return;
+  }
+  sectionInteraction = null;
+  document.body.style.cursor = '';
+  refresh();
+}
+
 function totalBars() {
   return song.sections.reduce((sum, sec) => sum + sec.bars, 0);
 }
@@ -787,20 +914,55 @@ function renderTimeline() {
     const width = bpx(sec.bars * secQpb(sec));
     const sectionStart = acc;
     const block = document.createElement('div');
-    block.className = 'tl-section inactive';
+    const isDragging = sectionInteraction && sectionInteraction.sectionId === sec.id;
+    block.className = `tl-section inactive${isDragging ? ' dragging' : ''}`;
     block.dataset.id = String(sec.id);
     block.style.left = `${bpx(acc + leadIn)}px`;
     block.style.width = `${Math.max(width - 2, 20)}px`;
     block.style.background = color.fill;
     block.innerHTML = `
-      <div class="tl-section-name" style="color:${color.text}">${sec.type}</div>
-      <div class="tl-section-bars" style="color:${color.text}">${sec.bars} bars · ${sec.bpb}/${sec.den}</div>
-      <div class="tl-section-chords" style="color:${color.text}">${sec.chords || '—'}</div>
+      <div class="tl-section-handle left" aria-hidden="true"></div>
+      <div class="tl-section-body">
+        <div class="tl-section-name" style="color:${color.text}">${sec.type}</div>
+        <div class="tl-section-bars" style="color:${color.text}">${sec.bars} bars · ${sec.bpb}/${sec.den}</div>
+        <div class="tl-section-chords" style="color:${color.text}">${sec.chords || '—'}</div>
+      </div>
+      <div class="tl-section-handle right" aria-hidden="true"></div>
     `;
+    block.onmousedown = (event) => {
+      if (event.button !== 0 || event.target.closest('.tl-section-handle')) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      beginSectionMove(event, sec.id);
+    };
     block.onclick = (event) => {
+      if (suppressTimelineClick) {
+        suppressTimelineClick = false;
+        event.stopPropagation();
+        return;
+      }
       event.stopPropagation();
       seekToBeat(sectionStart);
     };
+    const leftHandle = block.querySelector('.tl-section-handle.left');
+    const rightHandle = block.querySelector('.tl-section-handle.right');
+    if (leftHandle) {
+      leftHandle.onmousedown = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        beginSectionResize(event, sec.id, 'left');
+      };
+      leftHandle.style.display = sectionStart > 0 ? '' : 'none';
+    }
+    if (rightHandle) {
+      rightHandle.onmousedown = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        beginSectionResize(event, sec.id, 'right');
+      };
+    }
     inner.appendChild(block);
     acc += sec.bars * secQpb(sec);
   });
@@ -1159,6 +1321,10 @@ document.getElementById('add-section-btn').onclick = addSection;
 document.getElementById('sidebar-add').onclick = addSection;
 
 document.getElementById('timeline-wrap').onclick = (event) => {
+  if (suppressTimelineClick) {
+    suppressTimelineClick = false;
+    return;
+  }
   const wrap = document.getElementById('timeline-wrap');
   const rect = wrap.getBoundingClientRect();
   const x = event.clientX - rect.left + wrap.scrollLeft;
@@ -1166,6 +1332,17 @@ document.getElementById('timeline-wrap').onclick = (event) => {
 };
 
 window.addEventListener('mousemove', (event) => {
+  if (sectionInteraction) {
+    if (Math.abs(event.clientX - sectionInteraction.startClientX) > 3) {
+      suppressTimelineClick = true;
+    }
+    if (sectionInteraction.mode === 'move') {
+      updateSectionMove(event.clientX);
+    } else {
+      updateSectionResize(event.clientX);
+    }
+    return;
+  }
   if (!draggingSongStart) {
     return;
   }
@@ -1173,6 +1350,10 @@ window.addEventListener('mousemove', (event) => {
 });
 
 window.addEventListener('mouseup', () => {
+  if (sectionInteraction) {
+    endSectionInteraction();
+    return;
+  }
   if (!draggingSongStart) {
     return;
   }
