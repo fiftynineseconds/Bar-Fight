@@ -1,4 +1,4 @@
-# Band Timeline — Project Brief
+# Bar Fight
 
 ## Initial Prompt
 
