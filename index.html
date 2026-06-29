@@ -1,114 +1,327 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Band Timeline</title>
-<style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  :root {
-    --bg: #0d0d0f;
-    --bg2: #0a0a0c;
-    --bg3: #111113;
-    --border: #1e1e2e;
-    --border2: #2a2a3a;
-    --text: #e2e8f0;
-    --muted: #4b5563;
-    --muted2: #6b7280;
-    --font: 'SF Mono', 'Fira Code', Consolas, monospace;
-  }
-
-  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 13px; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-
-  /* HEADER */
-  #header { display: flex; align-items: center; gap: 16px; padding: 10px 20px; background: var(--bg2); border-bottom: 1px solid var(--border); flex-shrink: 0; }
-  #song-title { font-size: 18px; font-weight: 700; cursor: text; outline: none; background: transparent; border: none; border-bottom: 1px solid transparent; color: var(--text); font-family: var(--font); letter-spacing: 0.05em; }
-  #song-title:focus { border-bottom-color: #818cf8; }
-  .spacer { flex: 1; }
-  .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
-  #bpm-input { width: 60px; background: #1a1a2e; border: 1px solid #2d2d4e; color: #818cf8; border-radius: 4px; padding: 3px 6px; font-size: 14px; font-family: var(--font); text-align: center; }
-  .btn { background: #1e1e2e; border: 1px solid var(--muted); color: var(--muted); border-radius: 4px; padding: 5px 12px; cursor: pointer; font-family: var(--font); font-size: 13px; }
-  .btn:hover { border-color: var(--text); color: var(--text); }
-  .btn.green { background: #1a2a1a; border-color: #4ade80; color: #4ade80; }
-  .btn.purple { background: #1a1a2e; border-color: #818cf8; color: #818cf8; }
-
-  /* NOW PLAYING */
-  #now-playing { display: flex; align-items: center; gap: 24px; padding: 10px 20px; border-bottom: 2px solid #333; transition: background 0.3s, border-color 0.3s; flex-shrink: 0; min-height: 52px; }
-  #np-section { font-size: 20px; font-weight: 700; min-width: 120px; transition: color 0.3s; }
-  #np-bar { color: var(--muted2); font-size: 13px; }
-  #np-bar span { color: var(--text); font-weight: 600; }
-  #np-beat { color: var(--muted2); font-size: 13px; }
-  #np-beat span { color: var(--text); font-weight: 600; }
-  #np-chords { flex: 1; text-align: center; font-size: 15px; font-weight: 600; letter-spacing: 0.15em; transition: color 0.3s; }
-  #np-next { font-size: 12px; color: var(--muted); }
-
-  /* TIMELINE */
-  #timeline-wrap { position: relative; height: 110px; overflow-x: auto; overflow-y: hidden; background: var(--bg); border-bottom: 1px solid var(--border); flex-shrink: 0; cursor: crosshair; }
-  #timeline-inner { position: relative; height: 100%; }
-  .tl-section { position: absolute; top: 16px; height: 72px; border-radius: 3px; padding: 6px 8px; overflow: hidden; pointer-events: none; }
-  .tl-section-name { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
-  .tl-section-bars { font-size: 10px; color: var(--muted); margin-top: 2px; }
-  .tl-section-chords { font-size: 10px; color: var(--muted2); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .beat-line { position: absolute; top: 0; bottom: 0; width: 1px; pointer-events: none; }
-  #playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: #f87171; box-shadow: 0 0 8px #f87171; pointer-events: none; z-index: 10; }
-  #playhead-dot { width: 8px; height: 8px; background: #f87171; border-radius: 50%; margin-left: -3px; margin-top: 8px; }
-
-  /* EDITOR */
-  #editor { flex: 1; overflow-y: auto; padding: 12px 20px; background: var(--bg2); display: none; }
-  #editor.visible { display: block; }
-  #editor-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-  #sections-list { display: flex; flex-direction: column; gap: 6px; }
-  .sec-row { display: flex; align-items: center; gap: 8px; background: var(--bg3); border: 1px solid var(--border); border-radius: 4px; padding: 6px 10px; }
-  .sec-row select, .sec-row input { background: var(--bg); border: 1px solid var(--border2); color: var(--text); border-radius: 3px; padding: 3px 6px; font-size: 12px; font-family: var(--font); }
-  .sec-row input[type=number] { width: 46px; }
-  .sec-row input.chord-input { flex: 1; }
-  .sec-row select.time-sel { width: 58px; }
-  .move-btns { display: flex; flex-direction: column; gap: 1px; }
-  .move-btns button { background: transparent; border: none; color: var(--muted); cursor: pointer; padding: 1px 3px; font-size: 10px; line-height: 1; }
-  .move-btns button:hover { color: var(--text); }
-  .remove-btn { background: transparent; border: none; color: #f87171; cursor: pointer; padding: 2px 6px; font-size: 12px; }
-  .hint { flex: 1; display: flex; align-items: center; justify-content: center; color: #1e1e2e; font-size: 12px; }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Band Timeline</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #181209; --bg2: #221a0d; --bg3: #2e2213; --bg4: #3a2b18;
+      --border: #4a3820; --border-hi: #6b5230;
+      --text: #f5e6cc; --text2: #e2c99a; --muted: #8a7459; --muted2: #5c4e38;
+      --amber: #f59e0b; --amber-dim: #b45309;
+      --font-ui: -apple-system, "SF Pro Text", "Helvetica Neue", sans-serif;
+      --font-mono: "SF Mono", "Fira Code", Consolas, monospace;
+      --radius-lg: 14px;
+    }
+    html, body { height: 100%; }
+    body {
+      background: var(--bg); color: var(--text); font-family: var(--font-ui); font-size: 14px;
+      display: flex; flex-direction: column; height: 100vh; padding: 14px; overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+    #app-shell {
+      flex: 1; min-height: 0; display: flex; flex-direction: column;
+      border: 1px solid var(--border-hi); border-radius: var(--radius-lg); overflow: hidden;
+      background: linear-gradient(180deg, rgba(255,230,180,0.02), transparent 120px), var(--bg);
+      box-shadow: 0 16px 32px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,230,180,0.04) inset;
+    }
+    #toolbar {
+      display: flex; align-items: center; gap: 12px; padding: 0 22px; height: 60px;
+      background: var(--bg2); border-bottom: 1px solid var(--border); flex-shrink: 0;
+      box-shadow: 0 1px 0 rgba(255,230,180,0.04) inset;
+    }
+    #song-title {
+      font-size: 18px; font-weight: 700; background: transparent; border: none; color: var(--text);
+      font-family: var(--font-ui); letter-spacing: -0.02em; outline: none; min-width: 120px;
+      padding: 3px 0; border-bottom: 1px solid transparent; transition: border-color 0.15s;
+    }
+    #song-title:focus { border-bottom-color: var(--amber); }
+    .t-sep { width: 1px; height: 30px; background: var(--border); flex-shrink: 0; margin: 0 6px; }
+    .spacer { flex: 1; }
+    #transport {
+      display: flex; align-items: center; gap: 4px; background: #120d06;
+      border: 1px solid var(--border); border-radius: 10px; padding: 4px;
+    }
+    .t-btn {
+      display: flex; align-items: center; justify-content: center; width: 42px; height: 34px;
+      background: var(--bg3); border: 1px solid var(--border); border-bottom-color: var(--muted2);
+      border-radius: 5px; color: var(--muted); cursor: pointer;
+      transition: background 0.1s, color 0.1s, border-color 0.1s;
+      box-shadow: 0 1px 0 rgba(255,220,150,0.06) inset;
+    }
+    .t-btn:hover { background: var(--bg4); color: var(--text2); border-color: var(--border-hi); }
+    .t-btn.t-play { width: 48px; background: var(--amber); border-color: var(--amber-dim); color: #1c1409; box-shadow: 0 1px 4px rgba(245,158,11,0.4); }
+    .t-btn.t-play:hover { background: #fbbf24; }
+    #bpm-block {
+      display: flex; flex-direction: column; align-items: center; background: #0d0900;
+      border: 1px solid #3a2b18; border-radius: 5px; padding: 5px 12px;
+      box-shadow: 0 0 8px rgba(0,0,0,0.6) inset; min-width: 74px;
+    }
+    #bpm-input {
+      font-family: var(--font-mono); font-size: 22px; font-weight: 700; color: var(--amber);
+      background: transparent; border: none; outline: none; width: 56px; text-align: center;
+      letter-spacing: 0.04em; line-height: 1; text-shadow: 0 0 8px rgba(245,158,11,0.7);
+    }
+    #bpm-input:focus { color: #fcd34d; }
+    .bpm-label { font-size: 9px; font-weight: 700; letter-spacing: 0.2em; color: var(--muted2); text-transform: uppercase; margin-top: 1px; }
+    #progress-wrap { flex: 1; max-width: 280px; display: flex; flex-direction: column; gap: 3px; }
+    #progress-track { height: 7px; background: var(--bg4); border-radius: 3px; overflow: hidden; border: 1px solid var(--border); }
+    #progress-fill { height: 100%; width: 0; background: linear-gradient(90deg, var(--amber-dim), var(--amber)); border-radius: 3px; }
+    #progress-label { font-size: 11px; color: var(--muted); text-align: right; font-family: var(--font-mono); letter-spacing: 0.03em; }
+    #editor-toggle {
+      display: flex; align-items: center; gap: 6px; padding: 8px 15px; background: var(--bg3);
+      border: 1px solid var(--border-hi); border-radius: 999px; color: var(--text2);
+      font-size: 13px; font-weight: 600; font-family: var(--font-ui); cursor: pointer; white-space: nowrap;
+    }
+    #editor-toggle:hover { background: var(--bg4); }
+    #editor-toggle.active { background: rgba(245,158,11,0.15); border-color: var(--amber); color: var(--amber); }
+    #now-playing {
+      display: flex; align-items: stretch; flex-shrink: 0; height: 84px; border-bottom: 1px solid var(--border);
+      overflow: hidden; transition: background 0.4s; background: var(--bg2);
+    }
+    #np-section-slab { display: flex; align-items: center; padding: 0 28px; min-width: 190px; flex-shrink: 0; }
+    #np-section-name { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; transition: color 0.4s; white-space: nowrap; }
+    #np-position { display: flex; align-items: center; gap: 24px; padding: 0 24px; width: 190px; border-right: 1px solid var(--border); flex-shrink: 0; }
+    .np-stat { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+    .np-val { font-family: var(--font-mono); font-size: 28px; font-weight: 700; color: var(--text); line-height: 1; white-space: nowrap; }
+    .np-of { font-family: var(--font-mono); font-size: 13px; color: var(--muted); }
+    .np-lbl { font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted2); }
+    #np-chords-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 0 30px; border-right: 1px solid var(--border); min-width: 0; }
+    #np-chords {
+      font-family: var(--font-mono); font-size: 34px; font-weight: 700; letter-spacing: 0.18em; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis; min-width: 0; transition: color 0.4s; text-shadow: 0 0 20px rgba(191,219,254,0.2);
+    }
+    #np-next-wrap { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; padding: 0 26px; flex-shrink: 0; gap: 4px; min-width: 170px; }
+    .np-next-lbl { font-size: 10px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted2); }
+    #np-next-name { font-size: 17px; font-weight: 700; padding: 4px 12px; border-radius: 999px; letter-spacing: 0.02em; min-height: 33px; display: flex; align-items: center; }
+    #main { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+    #sidebar {
+      width: 186px; flex-shrink: 0; background: var(--bg2); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    #sidebar-header {
+      padding: 10px 12px 8px; font-size: 10px; font-weight: 700; letter-spacing: 0.15em;
+      text-transform: uppercase; color: var(--muted2); border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    #sidebar-list {
+      flex: 1; overflow-y: auto; padding: 9px 8px; display: flex; flex-direction: column; gap: 5px; scrollbar-width: none;
+    }
+    #sidebar-list::-webkit-scrollbar { display: none; }
+    .sidebar-chip {
+      display: flex; align-items: center; gap: 9px; padding: 7px 10px; border-radius: 7px; cursor: pointer;
+      transition: background 0.1s; font-size: 13px; font-weight: 600; color: var(--text2); border: 1px solid transparent;
+      background: transparent; font-family: inherit; text-align: left;
+    }
+    .sidebar-chip:hover { background: var(--bg3); }
+    .sidebar-chip.active { background: var(--bg4); border-color: var(--border-hi); color: var(--text); }
+    .sidebar-chip.active .chip-dot { box-shadow: 0 0 6px currentColor; }
+    .chip-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .chip-bars { margin-left: auto; font-size: 10px; color: var(--muted2); font-family: var(--font-mono); }
+    #sidebar-add {
+      flex-shrink: 0; margin: 8px; padding: 9px; background: transparent; border: 1px dashed var(--border-hi);
+      border-radius: 7px; color: var(--muted); font-size: 13px; font-weight: 600; font-family: var(--font-ui);
+      cursor: pointer; text-align: center; transition: background 0.15s, color 0.15s;
+    }
+    #sidebar-add:hover { background: var(--bg3); color: var(--amber); border-color: var(--amber); }
+    #right-panel { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+    #timeline-wrap {
+      position: relative; height: 244px; flex-shrink: 0; overflow-x: auto; overflow-y: hidden; background-color: #100c06;
+      background-image: repeating-linear-gradient(45deg, rgba(255,200,100,0.025) 0px, rgba(255,200,100,0.025) 1px, transparent 1px, transparent 12px);
+      border-bottom: 1px solid var(--border); cursor: crosshair; scrollbar-width: thin; scrollbar-color: var(--border) #100c06;
+    }
+    #timeline-wrap::-webkit-scrollbar { height: 5px; }
+    #timeline-wrap::-webkit-scrollbar-track { background: #100c06; }
+    #timeline-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    #ruler {
+      position: absolute; top: 0; left: 0; right: 0; height: 30px; background: var(--bg2);
+      border-bottom: 1px solid var(--border); pointer-events: none; z-index: 2;
+    }
+    .r-mark { position: absolute; top: 0; font-size: 12px; color: var(--muted2); padding-left: 5px; line-height: 30px; font-family: var(--font-mono); user-select: none; }
+    .r-tick { position: absolute; bottom: 0; width: 1px; }
+    .r-tick.major { height: 16px; background: var(--border-hi); }
+    .r-tick.minor { height: 9px; background: var(--border); }
+    #timeline-inner { position: relative; height: 100%; }
+    .tl-section {
+      position: absolute; top: 40px; height: 194px; border-radius: 12px; padding: 16px; overflow: hidden;
+      cursor: pointer; transition: filter 0.15s, transform 0.15s; border: 1px solid rgba(255,235,185,0.22);
+    }
+    .tl-section:hover { filter: brightness(1.15); transform: translateY(-1px); }
+    .tl-section-name { font-size: 19px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; font-family: var(--font-ui); opacity: 0.95; }
+    .tl-section-bars { font-size: 14px; opacity: 0.55; margin-top: 8px; font-family: var(--font-ui); font-weight: 500; }
+    .tl-section-chords {
+      font-size: 20px; opacity: 0.7; margin-top: 14px; font-family: var(--font-mono); white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis; letter-spacing: 0.1em;
+    }
+    .tl-section.active::after {
+      content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: rgba(255,255,255,0.55); border-radius: 4px 4px 0 0;
+    }
+    .tl-section.inactive { filter: brightness(0.6) saturate(0.6); }
+    #playhead {
+      position: absolute; top: 0; bottom: 0; width: 3px; background: var(--amber);
+      box-shadow: 0 0 6px var(--amber), 0 0 1px var(--amber); z-index: 10; pointer-events: none;
+    }
+    #playhead::before {
+      content: ""; position: absolute; top: 0; left: -5px; width: 0; height: 0;
+      border-left: 7px solid transparent; border-right: 7px solid transparent; border-top: 11px solid var(--amber);
+    }
+    #playhead-label {
+      position: absolute; top: 16px; left: 5px; background: var(--amber); color: #1c1409; font-family: var(--font-mono);
+      font-size: 11px; font-weight: 700; padding: 2px 5px; border-radius: 3px; white-space: nowrap; letter-spacing: 0.04em;
+    }
+    #editor { flex: 1; overflow-y: auto; background: var(--bg); min-height: 0; scrollbar-width: thin; scrollbar-color: var(--border) var(--bg); }
+    #editor.hidden { display: none; }
+    #editor::-webkit-scrollbar { width: 5px; }
+    #editor::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    #editor-inner { padding: 14px 18px; }
+    #editor-hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding-bottom: 9px; border-bottom: 1px solid var(--border); }
+    .ed-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); }
+    #add-section-btn {
+      display: flex; align-items: center; gap: 6px; padding: 5px 12px; background: var(--amber);
+      border: none; border-radius: 4px; color: #1c1409; font-size: 12px; font-weight: 700; font-family: var(--font-ui); cursor: pointer;
+    }
+    #sections-list { display: flex; flex-direction: column; gap: 7px; }
+    .sec-row {
+      display: flex; align-items: center; gap: 10px; padding: 8px 12px 8px 0; border-radius: 8px;
+      background: var(--bg2); border: 1px solid var(--border); overflow: hidden;
+    }
+    .sec-row:hover { background: var(--bg3); }
+    .sec-swatch { width: 8px; align-self: stretch; flex-shrink: 0; border-radius: 5px 0 0 5px; }
+    .move-btns { display: flex; flex-direction: column; gap: 1px; flex-shrink: 0; }
+    .move-btn {
+      background: transparent; border: none; color: var(--muted2); cursor: pointer; padding: 2px 5px;
+      font-size: 10px; line-height: 1; border-radius: 3px; transition: background 0.1s, color 0.1s;
+    }
+    .move-btn:hover { background: var(--bg4); color: var(--text); }
+    .move-btn:disabled { opacity: 0.2; pointer-events: none; }
+    .type-sel {
+      appearance: none; -webkit-appearance: none; background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text2); font-family: var(--font-ui); font-size: 13px; font-weight: 700;
+      padding: 5px 22px 5px 10px; width: 118px; cursor: pointer;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%235c4e38'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 6px center; transition: border-color 0.15s;
+    }
+    .type-sel:focus { outline: none; border-color: var(--amber); }
+    .f-grp { display: flex; align-items: center; gap: 5px; }
+    .f-lbl { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted2); white-space: nowrap; }
+    .num-in {
+      width: 48px; background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; color: var(--text);
+      font-family: var(--font-mono); font-size: 13px; padding: 5px 6px; text-align: center; transition: border-color 0.15s;
+    }
+    .num-in:focus { outline: none; border-color: var(--amber); }
+    .time-sel {
+      appearance: none; -webkit-appearance: none; background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text2); font-family: var(--font-mono); font-size: 13px;
+      padding: 5px 20px 5px 8px; width: 64px; cursor: pointer;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%235c4e38'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 5px center;
+    }
+    .time-sel:focus { outline: none; border-color: var(--amber); }
+    .chord-in {
+      flex: 1; background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; color: var(--text);
+      font-family: var(--font-mono); font-size: 13px; padding: 5px 8px; letter-spacing: 0.06em; transition: border-color 0.15s;
+    }
+    .chord-in:focus { outline: none; border-color: var(--amber); }
+    .chord-in::placeholder { color: var(--muted2); }
+    .rm-btn {
+      background: transparent; border: none; color: var(--muted2); cursor: pointer; padding: 4px 7px;
+      font-size: 15px; border-radius: 6px; transition: background 0.1s, color 0.1s; flex-shrink: 0;
+    }
+    .rm-btn:hover { background: rgba(180,50,30,0.2); color: #f87171; }
+    @media (max-width: 1200px) {
+      #progress-wrap { display: none; }
+      #sidebar { width: 164px; }
+      #np-section-slab { min-width: 160px; padding: 0 20px; }
+      #np-section-name { font-size: 25px; }
+      #np-position { width: 154px; gap: 14px; padding: 0 16px; }
+      .np-val { font-size: 24px; }
+      #np-chords { font-size: 28px; letter-spacing: 0.14em; }
+      #np-next-wrap { min-width: 140px; padding: 0 16px; }
+      #np-next-name { font-size: 15px; }
+    }
+    @media (max-width: 900px) {
+      #np-next-wrap { display: none; }
+      #np-chords-wrap { border-right: none; }
+      #np-position { width: 140px; }
+      #timeline-wrap { height: 230px; }
+      .tl-section { height: 180px; }
+    }
+  </style>
 </head>
 <body>
-
-<!-- HEADER -->
-<div id="header">
-  <input id="song-title" value="New Song" />
-  <div class="spacer"></div>
-  <span class="label">BPM</span>
-  <input id="bpm-input" type="number" value="120" min="20" max="400" />
-  <button class="btn" id="stop-btn">■ Stop</button>
-  <button class="btn green" id="play-btn">▶ Play</button>
-  <button class="btn" id="editor-toggle">Edit Sections</button>
-</div>
-
-<!-- NOW PLAYING -->
-<div id="now-playing">
-  <div id="np-section">—</div>
-  <div id="np-bar">Bar <span id="np-bar-num">—</span> / <span id="np-bar-total" style="color:var(--muted)">—</span></div>
-  <div id="np-beat">Beat <span id="np-beat-num">—</span></div>
-  <div id="np-chords"></div>
-  <div id="np-next"></div>
-</div>
-
-<!-- TIMELINE -->
-<div id="timeline-wrap">
-  <div id="timeline-inner"></div>
-</div>
-
-<!-- EDITOR -->
-<div id="editor">
-  <div id="editor-header">
-    <span class="label">Song Sections</span>
-    <button class="btn purple" id="add-section-btn">+ Add Section</button>
+  <div id="app-shell">
+    <div id="toolbar">
+      <input id="song-title" value="New Song" placeholder="Song Name" />
+      <div class="t-sep"></div>
+      <div id="transport">
+        <button class="t-btn" id="stop-btn" title="Stop">
+          <svg width="9" height="9" viewBox="0 0 9 9" fill="currentColor" aria-hidden="true"><rect x="0" y="0" width="9" height="9" rx="1"></rect></svg>
+        </button>
+        <button class="t-btn t-play" id="play-btn" title="Play">
+          <svg width="11" height="13" viewBox="0 0 11 13" fill="currentColor" aria-hidden="true"><path d="M1.5 1.5l8 5-8 5z"></path></svg>
+        </button>
+      </div>
+      <div id="bpm-block">
+        <input id="bpm-input" type="number" value="120" min="20" max="400" />
+        <div class="bpm-label">BPM</div>
+      </div>
+      <div id="progress-wrap">
+        <div id="progress-track"><div id="progress-fill"></div></div>
+        <div id="progress-label">Bar 1 / 1 · 0:00 / 0:00</div>
+      </div>
+      <div class="spacer"></div>
+      <button id="editor-toggle" class="active" title="Show or hide section editor">
+        <svg width="13" height="10" viewBox="0 0 13 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
+          <line x1="0" y1="1" x2="13" y2="1"></line>
+          <line x1="0" y1="5" x2="13" y2="5"></line>
+          <line x1="0" y1="9" x2="13" y2="9"></line>
+        </svg>
+        Edit Sections
+      </button>
+    </div>
+    <div id="now-playing">
+      <div id="np-section-slab"><div id="np-section-name">—</div></div>
+      <div id="np-position">
+        <div class="np-stat">
+          <div class="np-val"><span id="np-bar-num">—</span> <span class="np-of">/ <span id="np-bar-total">—</span></span></div>
+          <div class="np-lbl">Bar</div>
+        </div>
+        <div class="np-stat">
+          <div class="np-val" style="font-size:23px;"><span id="np-beat-num">—</span></div>
+          <div class="np-lbl">Beat</div>
+        </div>
+      </div>
+      <div id="np-chords-wrap"><div id="np-chords"></div></div>
+      <div id="np-next-wrap">
+        <div class="np-next-lbl">Up Next</div>
+        <div id="np-next-name">—</div>
+      </div>
+    </div>
+    <div id="main">
+      <div id="sidebar">
+        <div id="sidebar-header">Sections</div>
+        <div id="sidebar-list"></div>
+        <button id="sidebar-add">+ Add Section</button>
+      </div>
+      <div id="right-panel">
+        <div id="timeline-wrap">
+          <div id="ruler"></div>
+          <div id="timeline-inner"></div>
+        </div>
+        <div id="editor">
+          <div id="editor-inner">
+            <div id="editor-hdr">
+              <span class="ed-title">Song Sections</span>
+              <button id="add-section-btn">+ Add Section</button>
+            </div>
+            <div id="sections-list"></div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
-  <div id="sections-list"></div>
-</div>
-
-<div class="hint" id="hint">Click the timeline to seek · Press ▶ to play</div>
-
-<script src="app.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
