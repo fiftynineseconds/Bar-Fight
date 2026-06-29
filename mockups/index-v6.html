@@ -228,7 +228,7 @@
     display: flex;
     align-items: stretch;
     flex-shrink: 0;
-    height: 74px;
+    height: 84px;
     border-bottom: 1px solid var(--border);
     overflow: hidden;
     transition: background 0.4s;
@@ -240,13 +240,13 @@
     display: flex;
     align-items: center;
     padding: 0 28px;
-    min-width: 170px;
+    min-width: 190px;
     background: var(--c-verse-fill);
     transition: background 0.4s;
     flex-shrink: 0;
   }
   #np-section-name {
-    font-size: 26px;
+    font-size: 30px;
     font-weight: 800;
     letter-spacing: -0.02em;
     color: var(--c-verse-text);
@@ -257,34 +257,36 @@
   /* Bar / beat cluster */
   #np-position {
     display: flex;
-    flex-direction: column;
-    justify-content: center;
-    padding: 0 26px;
+    align-items: center;
+    gap: 24px;
+    padding: 0 24px;
+    width: 190px;
     border-right: 1px solid var(--border);
     flex-shrink: 0;
-    gap: 4px;
   }
-  .np-pos-row {
+  .np-stat {
     display: flex;
-    align-items: baseline;
-    gap: 5px;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
   }
-  .np-big {
+  .np-val {
     font-family: var(--font-mono);
-    font-size: 26px;
+    font-size: 28px;
     font-weight: 700;
     color: var(--text);
     line-height: 1;
+    white-space: nowrap;
   }
-  .np-small {
+  .np-of {
     font-family: var(--font-mono);
-    font-size: 14px;
+    font-size: 13px;
     color: var(--muted);
   }
-  .np-pos-lbl {
-    font-size: 10px;
+  .np-lbl {
+    font-size: 11px;
     font-weight: 700;
-    letter-spacing: 0.15em;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
     color: var(--muted2);
   }
@@ -297,12 +299,17 @@
     justify-content: center;
     padding: 0 30px;
     border-right: 1px solid var(--border);
+    min-width: 0;
   }
   #np-chords {
     font-family: var(--font-mono);
-    font-size: 30px;
+    font-size: 34px;
     font-weight: 700;
-    letter-spacing: 0.3em;
+    letter-spacing: 0.18em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
     color: var(--c-verse-text);
     transition: color 0.4s;
     text-shadow: 0 0 20px rgba(191,219,254,0.2);
@@ -317,6 +324,7 @@
     padding: 0 26px;
     flex-shrink: 0;
     gap: 4px;
+    min-width: 170px;
   }
   .np-next-lbl {
     font-size: 10px;
@@ -436,7 +444,7 @@
   /* ── TIMELINE ─────────────────────────────────────────────────── */
   #timeline-wrap {
     position: relative;
-    height: 170px;
+    height: 244px;
     flex-shrink: 0;
     overflow-x: auto;
     overflow-y: hidden;
@@ -463,7 +471,7 @@
 
   /* Ruler */
   #ruler {
-    position: absolute; top: 0; left: 0; right: 0; height: 24px;
+    position: absolute; top: 0; left: 0; right: 0; height: 30px;
     background: var(--bg2);
     border-bottom: 1px solid var(--border);
     pointer-events: none;
@@ -471,29 +479,31 @@
   }
   .r-mark {
     position: absolute; top: 0;
-    font-size: 10px; color: var(--muted2);
-    padding-left: 4px; line-height: 24px;
+    font-size: 12px; color: var(--muted2);
+    padding-left: 5px; line-height: 30px;
     font-family: var(--font-mono);
     user-select: none;
   }
   .r-tick { position: absolute; bottom: 0; width: 1px; }
-  .r-tick.major { height: 12px; background: var(--border-hi); }
-  .r-tick.minor { height: 6px;  background: var(--border); }
+  .r-tick.major { height: 16px; background: var(--border-hi); }
+  .r-tick.minor { height: 9px;  background: var(--border); }
 
   /* Section tape blocks — SOLID filled, not just accented */
   .tl-section {
     position: absolute;
-    top: 30px;
-    height: 128px;
-    border-radius: 8px;
-    padding: 10px 12px;
+    top: 40px;
+    height: 194px;
+    min-width: 220px;
+    border-radius: 12px;
+    padding: 16px 16px;
     overflow: hidden;
     cursor: pointer;
-    transition: filter 0.15s;
+    transition: filter 0.15s, transform 0.15s;
+    border: 1px solid rgba(255, 235, 185, 0.22);
   }
-  .tl-section:hover { filter: brightness(1.15); }
+  .tl-section:hover { filter: brightness(1.15); transform: translateY(-1px); }
   .tl-section-name {
-    font-size: 13px;
+    font-size: 19px;
     font-weight: 800;
     letter-spacing: 0.1em;
     text-transform: uppercase;
@@ -501,21 +511,21 @@
     opacity: 0.95;
   }
   .tl-section-bars {
-    font-size: 10px;
+    font-size: 14px;
     opacity: 0.55;
-    margin-top: 6px;
+    margin-top: 8px;
     font-family: var(--font-ui);
     font-weight: 500;
   }
   .tl-section-chords {
-    font-size: 12px;
+    font-size: 20px;
     opacity: 0.7;
-    margin-top: 10px;
+    margin-top: 14px;
     font-family: var(--font-mono);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.1em;
   }
   /* Active section gets a bright top highlight line */
   .tl-section.active::after {
@@ -533,7 +543,7 @@
   #playhead {
     position: absolute;
     top: 0; bottom: 0;
-    width: 2px;
+    width: 3px;
     background: var(--amber);
     box-shadow: 0 0 6px var(--amber), 0 0 1px var(--amber);
     z-index: 10;
@@ -544,24 +554,57 @@
     position: absolute;
     top: 0; left: -5px;
     width: 0; height: 0;
-    border-left: 6px solid transparent;
-    border-right: 6px solid transparent;
-    border-top: 9px solid var(--amber);
+    border-left: 7px solid transparent;
+    border-right: 7px solid transparent;
+    border-top: 11px solid var(--amber);
   }
   /* Time label on playhead */
   #playhead-label {
     position: absolute;
-    top: 14px;
+    top: 16px;
     left: 5px;
     background: var(--amber);
     color: #1c1409;
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 700;
     padding: 2px 5px;
     border-radius: 3px;
     white-space: nowrap;
     letter-spacing: 0.04em;
+  }
+
+  @media (max-width: 1200px) {
+    #progress-wrap { display: none; }
+    #sidebar { width: 164px; }
+    #np-section-slab {
+      min-width: 160px;
+      padding: 0 20px;
+    }
+    #np-section-name { font-size: 25px; }
+    #np-position {
+      width: 154px;
+      gap: 14px;
+      padding: 0 16px;
+    }
+    .np-val { font-size: 24px; }
+    #np-chords {
+      font-size: 28px;
+      letter-spacing: 0.14em;
+    }
+    #np-next-wrap {
+      min-width: 140px;
+      padding: 0 16px;
+    }
+    #np-next-name { font-size: 15px; }
+  }
+
+  @media (max-width: 900px) {
+    #np-next-wrap { display: none; }
+    #np-chords-wrap { border-right: none; }
+    #np-position { width: 140px; }
+    #timeline-wrap { height: 230px; }
+    .tl-section { height: 180px; }
   }
 
   /* ── EDITOR ───────────────────────────────────────────────────── */
@@ -763,15 +806,14 @@
 
   <!-- Bar / Beat -->
   <div id="np-position">
-    <div class="np-pos-row">
-      <span class="np-big">3</span>
-      <span class="np-small">/ 8</span>
+    <div class="np-stat">
+      <div class="np-val">3 <span class="np-of">/ 8</span></div>
+      <div class="np-lbl">Bar</div>
     </div>
-    <div class="np-pos-lbl">Bar</div>
-    <div class="np-pos-row" style="margin-top:2px;">
-      <span class="np-big" style="font-size:20px;">2</span>
+    <div class="np-stat">
+      <div class="np-val" style="font-size:23px;">2</div>
+      <div class="np-lbl">Beat</div>
     </div>
-    <div class="np-pos-lbl">Beat</div>
   </div>
 
   <!-- Chords — large center display -->
