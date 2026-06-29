@@ -1,0 +1,1056 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Band Timeline — v6 Warm Tape + Apple Spacing</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /*
+   * V6: "WARM TAPE + APPLE SPACING"
+   * ──────────────────────────────────────────────────────────────
+   * Keeps the warm-tape palette and structure from v3, but increases
+   * whitespace, control sizing, and typography for readability.
+   * The full app sits inside a rounded framed shell so content has
+   * breathing room and doesn't run against window edges.
+   * ──────────────────────────────────────────────────────────────
+   */
+
+  :root {
+    --bg:        #181209;   /* dark warm brown */
+    --bg2:       #221a0d;
+    --bg3:       #2e2213;
+    --bg4:       #3a2b18;
+    --border:    #4a3820;
+    --border-hi: #6b5230;
+    --text:      #f5e6cc;
+    --text2:     #e2c99a;
+    --muted:     #8a7459;
+    --muted2:    #5c4e38;
+    --amber:     #f59e0b;
+    --amber-dim: #b45309;
+    --font-ui:   -apple-system, "SF Pro Text", "Helvetica Neue", sans-serif;
+    --font-mono: "SF Mono", "Fira Code", Consolas, monospace;
+    --radius-lg: 14px;
+
+    /* Section tape colors — warm, saturated, printable on dark */
+    --c-intro-fill:  #15803d;  --c-intro-text:  #bbf7d0;
+    --c-verse-fill:  #1d4ed8;  --c-verse-text:  #bfdbfe;
+    --c-pchorus-fill:#7e22ce;  --c-pchorus-text:#e9d5ff;
+    --c-chorus-fill: #b91c1c;  --c-chorus-text: #fecaca;
+    --c-bridge-fill: #c2410c;  --c-bridge-text: #fed7aa;
+    --c-solo-fill:   #0e7490;  --c-solo-text:   #a5f3fc;
+    --c-outro-fill:  #854d0e;  --c-outro-text:  #fef08a;
+    --c-break-fill:  #374151;  --c-break-text:  #d1d5db;
+  }
+
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: 14px;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    padding: 14px;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  #app-shell {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border-hi);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: linear-gradient(180deg, rgba(255,230,180,0.02), transparent 120px), var(--bg);
+    box-shadow: 0 16px 32px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,230,180,0.04) inset;
+  }
+
+  /* ── TOOLBAR ──────────────────────────────────────────────────── */
+  #toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 22px;
+    height: 60px;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    box-shadow: 0 1px 0 rgba(255,230,180,0.04) inset;
+  }
+
+  #song-title {
+    font-size: 18px;
+    font-weight: 700;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-family: var(--font-ui);
+    letter-spacing: -0.02em;
+    outline: none;
+    min-width: 120px;
+    padding: 3px 0;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.15s;
+  }
+  #song-title:focus { border-bottom-color: var(--amber); }
+
+  .t-sep { width: 1px; height: 30px; background: var(--border); flex-shrink: 0; margin: 0 6px; }
+  .spacer { flex: 1; }
+
+  /* Transport: hardware-style buttons */
+  #transport {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: #120d06;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 4px;
+  }
+  .t-btn {
+    display: flex; align-items: center; justify-content: center;
+    width: 42px; height: 34px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-bottom-color: var(--muted2);
+    border-radius: 5px;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 13px;
+    transition: background 0.1s, color 0.1s, border-color 0.1s;
+    /* subtle top shine like a physical button */
+    box-shadow: 0 1px 0 rgba(255,220,150,0.06) inset;
+  }
+  .t-btn:hover { background: var(--bg4); color: var(--text2); border-color: var(--border-hi); }
+  .t-btn.t-play {
+    width: 48px;
+    background: var(--amber);
+    border-color: var(--amber-dim);
+    color: #1c1409;
+    font-size: 15px;
+    font-weight: 700;
+    box-shadow: 0 1px 4px rgba(245,158,11,0.4);
+  }
+  .t-btn.t-play:hover { background: #fbbf24; }
+
+  /* LED BPM display */
+  #bpm-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: #0d0900;
+    border: 1px solid #3a2b18;
+    border-radius: 5px;
+    padding: 5px 12px;
+    box-shadow: 0 0 8px rgba(0,0,0,0.6) inset;
+    min-width: 74px;
+  }
+  #bpm-input {
+    font-family: var(--font-mono);
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--amber);
+    background: transparent;
+    border: none;
+    outline: none;
+    width: 56px;
+    text-align: center;
+    letter-spacing: 0.04em;
+    line-height: 1;
+    /* LED glow */
+    text-shadow: 0 0 8px rgba(245,158,11,0.7);
+  }
+  #bpm-input:focus { color: #fcd34d; }
+  .bpm-label {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    color: var(--muted2);
+    text-transform: uppercase;
+    margin-top: 1px;
+  }
+
+  /* Progress bar (total song) */
+  #progress-wrap {
+    flex: 1;
+    max-width: 280px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  #progress-track {
+    height: 7px;
+    background: var(--bg4);
+    border-radius: 3px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  #progress-fill {
+    height: 100%;
+    width: 22%;   /* mockup: mid-Verse */
+    background: linear-gradient(90deg, var(--amber-dim), var(--amber));
+    border-radius: 3px;
+  }
+  #progress-label {
+    font-size: 11px;
+    color: var(--muted);
+    text-align: right;
+    font-family: var(--font-mono);
+    letter-spacing: 0.03em;
+  }
+
+  /* Edit sections button */
+  #editor-toggle {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 15px;
+    background: var(--bg3);
+    border: 1px solid var(--border-hi);
+    border-radius: 999px;
+    color: var(--text2);
+    font-size: 13px;
+    font-weight: 600;
+    font-family: var(--font-ui);
+    cursor: pointer;
+    transition: background 0.15s;
+    white-space: nowrap;
+  }
+  #editor-toggle:hover { background: var(--bg4); }
+  #editor-toggle.active { background: rgba(245,158,11,0.15); border-color: var(--amber); color: var(--amber); }
+
+  /* ── NOW PLAYING ──────────────────────────────────────────────── */
+  #now-playing {
+    display: flex;
+    align-items: stretch;
+    flex-shrink: 0;
+    height: 74px;
+    border-bottom: 1px solid var(--border);
+    overflow: hidden;
+    transition: background 0.4s;
+    background: var(--bg2);
+  }
+
+  /* Large colored section name slab */
+  #np-section-slab {
+    display: flex;
+    align-items: center;
+    padding: 0 28px;
+    min-width: 170px;
+    background: var(--c-verse-fill);
+    transition: background 0.4s;
+    flex-shrink: 0;
+  }
+  #np-section-name {
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--c-verse-text);
+    transition: color 0.4s;
+    white-space: nowrap;
+  }
+
+  /* Bar / beat cluster */
+  #np-position {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 0 26px;
+    border-right: 1px solid var(--border);
+    flex-shrink: 0;
+    gap: 4px;
+  }
+  .np-pos-row {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+  }
+  .np-big {
+    font-family: var(--font-mono);
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1;
+  }
+  .np-small {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    color: var(--muted);
+  }
+  .np-pos-lbl {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted2);
+  }
+
+  /* Chords — the star of the show */
+  #np-chords-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 30px;
+    border-right: 1px solid var(--border);
+  }
+  #np-chords {
+    font-family: var(--font-mono);
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: 0.3em;
+    color: var(--c-verse-text);
+    transition: color 0.4s;
+    text-shadow: 0 0 20px rgba(191,219,254,0.2);
+  }
+
+  /* Next section */
+  #np-next-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 0 26px;
+    flex-shrink: 0;
+    gap: 4px;
+  }
+  .np-next-lbl {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted2);
+  }
+  #np-next-name {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--c-chorus-text);
+    background: var(--c-chorus-fill);
+    padding: 4px 12px;
+    border-radius: 999px;
+    letter-spacing: 0.02em;
+  }
+
+  /* ── MAIN AREA (sidebar + timeline + editor) ──────────────────── */
+  #main {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  /* ── SECTION SIDEBAR ──────────────────────────────────────────── */
+  #sidebar {
+    width: 186px;
+    flex-shrink: 0;
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  #sidebar-header {
+    padding: 10px 12px 8px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted2);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  #sidebar-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 9px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    scrollbar-width: none;
+  }
+  #sidebar-list::-webkit-scrollbar { display: none; }
+
+  .sidebar-chip {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 7px 10px;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: background 0.1s;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text2);
+    border: 1px solid transparent;
+  }
+  .sidebar-chip:hover { background: var(--bg3); }
+  .sidebar-chip.active {
+    background: var(--bg4);
+    border-color: var(--border-hi);
+    color: var(--text);
+  }
+  .sidebar-chip.active .chip-dot { box-shadow: 0 0 6px currentColor; }
+
+  .chip-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .chip-bars {
+    margin-left: auto;
+    font-size: 10px;
+    color: var(--muted2);
+    font-family: var(--font-mono);
+  }
+
+  #sidebar-add {
+    flex-shrink: 0;
+    margin: 8px;
+    padding: 9px;
+    background: transparent;
+    border: 1px dashed var(--border-hi);
+    border-radius: 7px;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 600;
+    font-family: var(--font-ui);
+    cursor: pointer;
+    text-align: center;
+    transition: background 0.15s, color 0.15s;
+  }
+  #sidebar-add:hover { background: var(--bg3); color: var(--amber); border-color: var(--amber); }
+
+  /* ── RIGHT PANEL ──────────────────────────────────────────────── */
+  #right-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  /* ── TIMELINE ─────────────────────────────────────────────────── */
+  #timeline-wrap {
+    position: relative;
+    height: 170px;
+    flex-shrink: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    /* tape-deck background: subtle diagonal weave */
+    background-color: #100c06;
+    background-image:
+      repeating-linear-gradient(
+        45deg,
+        rgba(255,200,100,0.025) 0px,
+        rgba(255,200,100,0.025) 1px,
+        transparent 1px,
+        transparent 12px
+      );
+    border-bottom: 1px solid var(--border);
+    cursor: crosshair;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) #100c06;
+  }
+  #timeline-wrap::-webkit-scrollbar { height: 5px; }
+  #timeline-wrap::-webkit-scrollbar-track { background: #100c06; }
+  #timeline-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  #timeline-inner { position: relative; height: 100%; width: 2520px; }
+
+  /* Ruler */
+  #ruler {
+    position: absolute; top: 0; left: 0; right: 0; height: 24px;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    pointer-events: none;
+    z-index: 2;
+  }
+  .r-mark {
+    position: absolute; top: 0;
+    font-size: 10px; color: var(--muted2);
+    padding-left: 4px; line-height: 24px;
+    font-family: var(--font-mono);
+    user-select: none;
+  }
+  .r-tick { position: absolute; bottom: 0; width: 1px; }
+  .r-tick.major { height: 12px; background: var(--border-hi); }
+  .r-tick.minor { height: 6px;  background: var(--border); }
+
+  /* Section tape blocks — SOLID filled, not just accented */
+  .tl-section {
+    position: absolute;
+    top: 30px;
+    height: 128px;
+    border-radius: 8px;
+    padding: 10px 12px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: filter 0.15s;
+  }
+  .tl-section:hover { filter: brightness(1.15); }
+  .tl-section-name {
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-family: var(--font-ui);
+    opacity: 0.95;
+  }
+  .tl-section-bars {
+    font-size: 10px;
+    opacity: 0.55;
+    margin-top: 6px;
+    font-family: var(--font-ui);
+    font-weight: 500;
+  }
+  .tl-section-chords {
+    font-size: 12px;
+    opacity: 0.7;
+    margin-top: 10px;
+    font-family: var(--font-mono);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    letter-spacing: 0.08em;
+  }
+  /* Active section gets a bright top highlight line */
+  .tl-section.active::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: rgba(255,255,255,0.55);
+    border-radius: 4px 4px 0 0;
+  }
+  /* Dim inactive sections slightly */
+  .tl-section.inactive { filter: brightness(0.6) saturate(0.6); }
+
+  /* Playhead */
+  #playhead {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 2px;
+    background: var(--amber);
+    box-shadow: 0 0 6px var(--amber), 0 0 1px var(--amber);
+    z-index: 10;
+  }
+  /* Downward triangle indicator */
+  #playhead::before {
+    content: '';
+    position: absolute;
+    top: 0; left: -5px;
+    width: 0; height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 9px solid var(--amber);
+  }
+  /* Time label on playhead */
+  #playhead-label {
+    position: absolute;
+    top: 14px;
+    left: 5px;
+    background: var(--amber);
+    color: #1c1409;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 5px;
+    border-radius: 3px;
+    white-space: nowrap;
+    letter-spacing: 0.04em;
+  }
+
+  /* ── EDITOR ───────────────────────────────────────────────────── */
+  #editor {
+    flex: 1;
+    overflow-y: auto;
+    background: var(--bg);
+    min-height: 0;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) var(--bg);
+  }
+  #editor::-webkit-scrollbar { width: 5px; }
+  #editor::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  #editor-inner { padding: 14px 18px; }
+
+  #editor-hdr {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    padding-bottom: 9px;
+    border-bottom: 1px solid var(--border);
+  }
+  .ed-title {
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.12em;
+    color: var(--muted);
+  }
+
+  #sections-list { display: flex; flex-direction: column; gap: 7px; }
+
+  .sec-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px 8px 0;
+    border-radius: 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+  .sec-row:hover { background: var(--bg3); }
+
+  /* Color swatch instead of left border */
+  .sec-swatch {
+    width: 8px;
+    align-self: stretch;
+    flex-shrink: 0;
+    border-radius: 5px 0 0 5px;
+  }
+
+  .move-btns { display: flex; flex-direction: column; gap: 1px; flex-shrink: 0; }
+  .move-btn {
+    background: transparent; border: none;
+    color: var(--muted2); cursor: pointer;
+    padding: 2px 5px; font-size: 10px; line-height: 1;
+    border-radius: 3px;
+    transition: background 0.1s, color 0.1s;
+  }
+  .move-btn:hover { background: var(--bg4); color: var(--text); }
+  .move-btn:disabled { opacity: 0.2; pointer-events: none; }
+
+  .type-sel {
+    appearance: none; -webkit-appearance: none;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text2);
+    font-family: var(--font-ui);
+    font-size: 13px;
+    font-weight: 700;
+    padding: 5px 22px 5px 10px;
+    width: 118px;
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%235c4e38'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 6px center;
+    transition: border-color 0.15s;
+  }
+  .type-sel:focus { outline: none; border-color: var(--amber); }
+
+  .f-grp { display: flex; align-items: center; gap: 5px; }
+  .f-lbl {
+    font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--muted2); white-space: nowrap;
+  }
+  .num-in {
+    width: 48px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    padding: 5px 6px;
+    text-align: center;
+    transition: border-color 0.15s;
+  }
+  .num-in:focus { outline: none; border-color: var(--amber); }
+  .time-sel {
+    appearance: none; -webkit-appearance: none;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text2);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    padding: 5px 20px 5px 8px;
+    width: 64px;
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%235c4e38'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 5px center;
+  }
+  .time-sel:focus { outline: none; border-color: var(--amber); }
+  .chord-in {
+    flex: 1;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    padding: 5px 8px;
+    letter-spacing: 0.06em;
+    transition: border-color 0.15s;
+  }
+  .chord-in:focus { outline: none; border-color: var(--amber); }
+  .chord-in::placeholder { color: var(--muted2); }
+
+  .rm-btn {
+    background: transparent; border: none;
+    color: var(--muted2); cursor: pointer;
+    padding: 4px 7px; font-size: 15px;
+    border-radius: 6px;
+    transition: background 0.1s, color 0.1s;
+    flex-shrink: 0;
+  }
+  .rm-btn:hover { background: rgba(180,50,30,0.2); color: #f87171; }
+</style>
+</head>
+<body>
+<div id="app-shell">
+
+<!-- ── TOOLBAR ───────────────────────────────────────────────────── -->
+<div id="toolbar">
+  <input id="song-title" value="New Song" placeholder="Song Name" />
+  <div class="t-sep"></div>
+
+  <div id="transport">
+    <!-- Stop -->
+    <button class="t-btn" title="Stop">
+      <svg width="9" height="9" viewBox="0 0 9 9" fill="currentColor">
+        <rect x="0" y="0" width="9" height="9" rx="1"/>
+      </svg>
+    </button>
+    <!-- Play (amber, active) -->
+    <button class="t-btn t-play" title="Pause">
+      <svg width="11" height="13" viewBox="0 0 11 13" fill="currentColor">
+        <path d="M1.5 1.5l8 5-8 5z"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- LED BPM -->
+  <div id="bpm-block">
+    <input id="bpm-input" type="number" value="120" min="20" max="400" />
+    <div class="bpm-label">BPM</div>
+  </div>
+
+  <!-- Song progress -->
+  <div id="progress-wrap">
+    <div id="progress-track">
+      <div id="progress-fill"></div>
+    </div>
+    <div id="progress-label">Bar 11 / 52 &nbsp;·&nbsp; 0:32 / 2:26</div>
+  </div>
+
+  <div class="spacer"></div>
+
+  <button id="editor-toggle" class="active">
+    <svg width="13" height="10" viewBox="0 0 13 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+      <line x1="0" y1="1" x2="13" y2="1"/>
+      <line x1="0" y1="5" x2="13" y2="5"/>
+      <line x1="0" y1="9" x2="13" y2="9"/>
+    </svg>
+    Edit Sections
+  </button>
+</div>
+
+<!-- ── NOW PLAYING ──────────────────────────────────────────────── -->
+<div id="now-playing">
+  <!-- Colored section slab -->
+  <div id="np-section-slab">
+    <div id="np-section-name">Verse</div>
+  </div>
+
+  <!-- Bar / Beat -->
+  <div id="np-position">
+    <div class="np-pos-row">
+      <span class="np-big">3</span>
+      <span class="np-small">/ 8</span>
+    </div>
+    <div class="np-pos-lbl">Bar</div>
+    <div class="np-pos-row" style="margin-top:2px;">
+      <span class="np-big" style="font-size:20px;">2</span>
+    </div>
+    <div class="np-pos-lbl">Beat</div>
+  </div>
+
+  <!-- Chords — large center display -->
+  <div id="np-chords-wrap">
+    <div id="np-chords">E &nbsp; A &nbsp; E &nbsp; B</div>
+  </div>
+
+  <!-- Next section -->
+  <div id="np-next-wrap">
+    <div class="np-next-lbl">Up Next</div>
+    <div id="np-next-name">Chorus</div>
+  </div>
+</div>
+
+<!-- ── MAIN AREA ────────────────────────────────────────────────── -->
+<div id="main">
+
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+    <div id="sidebar-header">Sections</div>
+    <div id="sidebar-list">
+
+      <div class="sidebar-chip">
+        <span class="chip-dot" style="background:#15803d;"></span>
+        Intro
+        <span class="chip-bars">4</span>
+      </div>
+      <div class="sidebar-chip active">
+        <span class="chip-dot" style="background:#1d4ed8; box-shadow:0 0 6px #3b82f6;"></span>
+        Verse
+        <span class="chip-bars">8</span>
+      </div>
+      <div class="sidebar-chip">
+        <span class="chip-dot" style="background:#b91c1c;"></span>
+        Chorus
+        <span class="chip-bars">8</span>
+      </div>
+      <div class="sidebar-chip">
+        <span class="chip-dot" style="background:#1d4ed8;"></span>
+        Verse
+        <span class="chip-bars">8</span>
+      </div>
+      <div class="sidebar-chip">
+        <span class="chip-dot" style="background:#b91c1c;"></span>
+        Chorus
+        <span class="chip-bars">8</span>
+      </div>
+      <div class="sidebar-chip">
+        <span class="chip-dot" style="background:#c2410c;"></span>
+        Bridge
+        <span class="chip-bars">4</span>
+      </div>
+      <div class="sidebar-chip">
+        <span class="chip-dot" style="background:#0e7490;"></span>
+        Solo
+        <span class="chip-bars">8</span>
+      </div>
+      <div class="sidebar-chip">
+        <span class="chip-dot" style="background:#b91c1c;"></span>
+        Chorus
+        <span class="chip-bars">8</span>
+      </div>
+      <div class="sidebar-chip">
+        <span class="chip-dot" style="background:#854d0e;"></span>
+        Outro
+        <span class="chip-bars">4</span>
+      </div>
+    </div>
+    <button id="sidebar-add">+ Add Section</button>
+  </div>
+
+  <!-- RIGHT: timeline + editor -->
+  <div id="right-panel">
+
+    <!-- TIMELINE -->
+    <div id="timeline-wrap">
+      <div id="ruler">
+        <div class="r-mark" style="left:0">1</div>
+        <div class="r-tick major" style="left:0"></div>
+        <div class="r-mark" style="left:160px">5</div>
+        <div class="r-tick major" style="left:160px"></div>
+        <div class="r-mark" style="left:320px">9</div>
+        <div class="r-tick major" style="left:320px"></div>
+        <div class="r-mark" style="left:480px">13</div>
+        <div class="r-tick major" style="left:480px"></div>
+        <div class="r-mark" style="left:640px">17</div>
+        <div class="r-tick major" style="left:640px"></div>
+        <div class="r-mark" style="left:800px">21</div>
+        <div class="r-tick major" style="left:800px"></div>
+        <div class="r-mark" style="left:960px">25</div>
+        <div class="r-tick major" style="left:960px"></div>
+        <div class="r-mark" style="left:1120px">29</div>
+        <div class="r-tick major" style="left:1120px"></div>
+        <!-- minor ticks -->
+        <div class="r-tick minor" style="left:40px"></div>
+        <div class="r-tick minor" style="left:80px"></div>
+        <div class="r-tick minor" style="left:120px"></div>
+        <div class="r-tick minor" style="left:200px"></div>
+        <div class="r-tick minor" style="left:240px"></div>
+        <div class="r-tick minor" style="left:280px"></div>
+        <div class="r-tick minor" style="left:360px"></div>
+        <div class="r-tick minor" style="left:400px"></div>
+        <div class="r-tick minor" style="left:440px"></div>
+        <div class="r-tick minor" style="left:520px"></div>
+        <div class="r-tick minor" style="left:560px"></div>
+        <div class="r-tick minor" style="left:600px"></div>
+      </div>
+
+      <div id="timeline-inner">
+
+        <!-- Intro — 4 bars, 160px wide -->
+        <div class="tl-section inactive" style="left:0; width:158px; background:var(--c-intro-fill);">
+          <div class="tl-section-name" style="color:var(--c-intro-text)">Intro</div>
+          <div class="tl-section-bars" style="color:var(--c-intro-text)">4 bars · 4/4</div>
+          <div class="tl-section-chords" style="color:var(--c-intro-text)">E  A  B  A</div>
+        </div>
+
+        <!-- Verse — 8 bars, 320px — ACTIVE -->
+        <div class="tl-section active" style="left:160px; width:318px; background:var(--c-verse-fill);">
+          <div class="tl-section-name" style="color:var(--c-verse-text)">Verse</div>
+          <div class="tl-section-bars" style="color:var(--c-verse-text)">8 bars · 4/4</div>
+          <div class="tl-section-chords" style="color:var(--c-verse-text)">E  A  E  B</div>
+        </div>
+
+        <!-- Chorus — 8 bars -->
+        <div class="tl-section inactive" style="left:480px; width:318px; background:var(--c-chorus-fill);">
+          <div class="tl-section-name" style="color:var(--c-chorus-text)">Chorus</div>
+          <div class="tl-section-bars" style="color:var(--c-chorus-text)">8 bars · 4/4</div>
+          <div class="tl-section-chords" style="color:var(--c-chorus-text)">A  E  B  A</div>
+        </div>
+
+        <!-- Verse 2 -->
+        <div class="tl-section inactive" style="left:800px; width:318px; background:var(--c-verse-fill);">
+          <div class="tl-section-name" style="color:var(--c-verse-text)">Verse</div>
+          <div class="tl-section-bars" style="color:var(--c-verse-text)">8 bars · 4/4</div>
+          <div class="tl-section-chords" style="color:var(--c-verse-text)">E  A  E  B</div>
+        </div>
+
+        <!-- Chorus 2 -->
+        <div class="tl-section inactive" style="left:1120px; width:318px; background:var(--c-chorus-fill);">
+          <div class="tl-section-name" style="color:var(--c-chorus-text)">Chorus</div>
+          <div class="tl-section-bars" style="color:var(--c-chorus-text)">8 bars · 4/4</div>
+          <div class="tl-section-chords" style="color:var(--c-chorus-text)">A  E  B  A</div>
+        </div>
+
+        <!-- Bridge — 4 bars -->
+        <div class="tl-section inactive" style="left:1440px; width:158px; background:var(--c-bridge-fill);">
+          <div class="tl-section-name" style="color:var(--c-bridge-text)">Bridge</div>
+          <div class="tl-section-bars" style="color:var(--c-bridge-text)">4 bars · 4/4</div>
+          <div class="tl-section-chords" style="color:var(--c-bridge-text)">C#m  A  B  B</div>
+        </div>
+
+        <!-- Solo — 8 bars -->
+        <div class="tl-section inactive" style="left:1600px; width:318px; background:var(--c-solo-fill);">
+          <div class="tl-section-name" style="color:var(--c-solo-text)">Solo</div>
+          <div class="tl-section-bars" style="color:var(--c-solo-text)">8 bars · 4/4</div>
+          <div class="tl-section-chords" style="color:var(--c-solo-text)">E  A  E  B</div>
+        </div>
+
+        <!-- Chorus 3 -->
+        <div class="tl-section inactive" style="left:1920px; width:318px; background:var(--c-chorus-fill);">
+          <div class="tl-section-name" style="color:var(--c-chorus-text)">Chorus</div>
+          <div class="tl-section-bars" style="color:var(--c-chorus-text)">8 bars · 4/4</div>
+          <div class="tl-section-chords" style="color:var(--c-chorus-text)">A  E  B  A</div>
+        </div>
+
+        <!-- Outro — 4 bars -->
+        <div class="tl-section inactive" style="left:2240px; width:158px; background:var(--c-outro-fill);">
+          <div class="tl-section-name" style="color:var(--c-outro-text)">Outro</div>
+          <div class="tl-section-bars" style="color:var(--c-outro-text)">4 bars · 4/4</div>
+          <div class="tl-section-chords" style="color:var(--c-outro-text)">E  E  E  E</div>
+        </div>
+
+        <!-- Playhead — amber, mid-Verse -->
+        <div id="playhead" style="left:330px;">
+          <div id="playhead-label">3.2</div>
+        </div>
+
+      </div>
+    </div><!-- /timeline-wrap -->
+
+    <!-- EDITOR -->
+    <div id="editor">
+      <div id="editor-inner">
+        <div id="editor-hdr">
+          <span class="ed-title">Song Sections</span>
+          <button style="display:flex;align-items:center;gap:6px;padding:5px 12px;background:var(--amber);border:none;border-radius:4px;color:#1c1409;font-size:12px;font-weight:700;font-family:var(--font-ui);cursor:pointer;">
+            + Add Section
+          </button>
+        </div>
+
+        <div id="sections-list">
+
+          <!-- Intro -->
+          <div class="sec-row">
+            <div class="sec-swatch" style="background:var(--c-intro-fill);"></div>
+            <div class="move-btns">
+              <button class="move-btn" disabled>▲</button>
+              <button class="move-btn">▼</button>
+            </div>
+            <select class="type-sel">
+              <option selected>Intro</option><option>Verse</option><option>Pre-Chorus</option>
+              <option>Chorus</option><option>Bridge</option><option>Solo</option><option>Outro</option><option>Break</option>
+            </select>
+            <div class="f-grp">
+              <span class="f-lbl">Bars</span>
+              <input type="number" class="num-in" value="4" />
+            </div>
+            <div class="f-grp">
+              <span class="f-lbl">Time</span>
+              <select class="time-sel"><option>4/4</option><option>3/4</option><option>6/8</option></select>
+            </div>
+            <div class="f-grp" style="flex:1;">
+              <span class="f-lbl">Chords</span>
+              <input type="text" class="chord-in" value="E  A  B  A" />
+            </div>
+            <button class="rm-btn">✕</button>
+          </div>
+
+          <!-- Verse (active) -->
+          <div class="sec-row" style="background:var(--bg3); border-color:var(--border-hi);">
+            <div class="sec-swatch" style="background:var(--c-verse-fill);"></div>
+            <div class="move-btns">
+              <button class="move-btn">▲</button>
+              <button class="move-btn">▼</button>
+            </div>
+            <select class="type-sel" style="color:var(--c-verse-text); border-color:rgba(59,130,246,0.4);">
+              <option>Intro</option><option selected>Verse</option><option>Pre-Chorus</option>
+              <option>Chorus</option><option>Bridge</option><option>Solo</option><option>Outro</option><option>Break</option>
+            </select>
+            <div class="f-grp">
+              <span class="f-lbl">Bars</span>
+              <input type="number" class="num-in" value="8" style="border-color:var(--amber);" />
+            </div>
+            <div class="f-grp">
+              <span class="f-lbl">Time</span>
+              <select class="time-sel"><option>4/4</option></select>
+            </div>
+            <div class="f-grp" style="flex:1;">
+              <span class="f-lbl">Chords</span>
+              <input type="text" class="chord-in" value="E  A  E  B" style="border-color:var(--amber);" />
+            </div>
+            <button class="rm-btn">✕</button>
+          </div>
+
+          <!-- Chorus -->
+          <div class="sec-row">
+            <div class="sec-swatch" style="background:var(--c-chorus-fill);"></div>
+            <div class="move-btns">
+              <button class="move-btn">▲</button>
+              <button class="move-btn">▼</button>
+            </div>
+            <select class="type-sel" style="color:var(--c-chorus-text);">
+              <option>Intro</option><option>Verse</option><option>Pre-Chorus</option>
+              <option selected>Chorus</option><option>Bridge</option><option>Solo</option><option>Outro</option><option>Break</option>
+            </select>
+            <div class="f-grp">
+              <span class="f-lbl">Bars</span>
+              <input type="number" class="num-in" value="8" />
+            </div>
+            <div class="f-grp">
+              <span class="f-lbl">Time</span>
+              <select class="time-sel"><option>4/4</option></select>
+            </div>
+            <div class="f-grp" style="flex:1;">
+              <span class="f-lbl">Chords</span>
+              <input type="text" class="chord-in" value="A  E  B  A" />
+            </div>
+            <button class="rm-btn">✕</button>
+          </div>
+
+          <div style="color:var(--muted2);font-size:11px;padding:6px 4px;text-align:center;font-style:italic;">+ 6 more sections</div>
+        </div>
+      </div>
+    </div><!-- /editor -->
+
+  </div><!-- /right-panel -->
+</div><!-- /main -->
+
+</div><!-- /app-shell -->
+</body>
+</html>
