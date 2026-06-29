@@ -12,6 +12,9 @@
 - A header bar shows the current section, bar number, beat, and chords at a glance, with a "Next: [section]" preview
 - Click anywhere on the timeline to seek
 - Save songs to a JSON file and load them back from disk
+- Optionally load audio, view waveform, and drag a timeline "Song Start" marker to line sections up visually
+- Detect BPM from loaded audio and apply it to the timeline tempo
+- Song JSON now includes optional `audio` metadata (`startOffsetSec`, `fileName`) for alignment recall
 
 ## Stack & Structure
 

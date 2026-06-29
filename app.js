@@ -2,6 +2,7 @@ const PX_PER_BEAT = 40;
 
 const ICON_PLAY = '<svg width="11" height="13" viewBox="0 0 11 13" fill="currentColor" aria-hidden="true"><path d="M1.5 1.5l8 5-8 5z"></path></svg>';
 const ICON_PAUSE = '<svg width="11" height="13" viewBox="0 0 11 13" fill="currentColor" aria-hidden="true"><rect x="1" y="1" width="3" height="11" rx="1"></rect><rect x="7" y="1" width="3" height="11" rx="1"></rect></svg>';
+const WAVEFORM_HEIGHT = 194;
 
 const COLORS = {
   Intro: { fill: '#15803d', text: '#bbf7d0' },
@@ -37,6 +38,284 @@ let currentBeat = 0;
 let startTime = null;
 let startBeat = 0;
 let rafId = null;
+const audioPlayer = new Audio();
+audioPlayer.preload = 'auto';
+let audioCtx = null;
+let audioObjectUrl = null;
+let loadedAudioName = '';
+let loadedAudioDurationSec = 0;
+let waveformPeaks = null;
+let waveformVersion = 0;
+let audioStartOffsetSec = 0;
+let draggingSongStart = false;
+let loadedAudioBuffer = null;
+let detectingBpm = false;
+let expectedAudioFileName = '';
+
+function availableAudioDurationSec() {
+  return Math.max(0, loadedAudioDurationSec - audioStartOffsetSec);
+}
+
+function timelineLeadInBeats() {
+  if (loadedAudioDurationSec <= 0) {
+    return 0;
+  }
+  return secondsToBeat(audioStartOffsetSec);
+}
+
+function clampAudioStartOffset(seconds) {
+  if (loadedAudioDurationSec <= 0) {
+    return Math.max(0, seconds);
+  }
+  const maxOffset = Math.max(0, loadedAudioDurationSec - 0.01);
+  return Math.max(0, Math.min(seconds, maxOffset));
+}
+
+function updateAudioOffsetUi() {
+  // Timeline marker is the primary alignment control.
+}
+
+function setAudioStartOffset(nextOffset, options = {}) {
+  const { keepPlayback = true } = options;
+  const previousOffset = audioStartOffsetSec;
+  const clampedOffset = clampAudioStartOffset(nextOffset);
+  audioStartOffsetSec = clampedOffset;
+
+  if (loadedAudioDurationSec > 0) {
+    if (keepPlayback) {
+      currentBeat = clampBeat(currentBeat + secondsToBeat(previousOffset - audioStartOffsetSec));
+    } else {
+      currentBeat = clampBeat(currentBeat);
+    }
+    audioPlayer.currentTime = Math.min(loadedAudioDurationSec, Math.max(0, beatToAudioTime(currentBeat)));
+  } else {
+    currentBeat = clampBeat(currentBeat);
+  }
+
+  updateAudioOffsetUi();
+  updateAudioStatus();
+  refresh();
+}
+
+function setAudioStartOffsetFromTimelineX(xPx) {
+  const nextOffset = beatToSeconds(Math.max(0, xPx / PX_PER_BEAT));
+  setAudioStartOffset(nextOffset);
+}
+
+function updateSongStartFromPointer(clientX) {
+  const wrap = document.getElementById('timeline-wrap');
+  const rect = wrap.getBoundingClientRect();
+  const x = clientX - rect.left + wrap.scrollLeft;
+  setAudioStartOffsetFromTimelineX(x);
+}
+
+function beginSongStartDrag(event) {
+  if (loadedAudioDurationSec <= 0) {
+    return;
+  }
+  draggingSongStart = true;
+  document.body.style.cursor = 'ew-resize';
+  updateSongStartFromPointer(event.clientX);
+}
+
+function totalTimelineBeats() {
+  const songBeats = totalBeats();
+  if (loadedAudioDurationSec <= 0) {
+    return songBeats;
+  }
+  return Math.max(songBeats, secondsToBeat(availableAudioDurationSec()));
+}
+
+function totalVisualTimelineBeats() {
+  return totalTimelineBeats() + timelineLeadInBeats();
+}
+
+function beatToSeconds(beat) {
+  return (beat * 60) / song.bpm;
+}
+
+function secondsToBeat(seconds) {
+  return (seconds * song.bpm) / 60;
+}
+
+function beatToAudioTime(beat) {
+  return beatToSeconds(beat) + audioStartOffsetSec;
+}
+
+function audioTimeToBeat(seconds) {
+  return secondsToBeat(seconds - audioStartOffsetSec);
+}
+
+function updateAudioStatus() {
+  const status = document.getElementById('audio-status');
+  if (!loadedAudioDurationSec) {
+    if (expectedAudioFileName) {
+      status.textContent = `No audio loaded · Expected: ${expectedAudioFileName}`;
+      return;
+    }
+    status.textContent = 'No audio loaded';
+    return;
+  }
+  status.textContent = `${loadedAudioName} (${fmtTime(loadedAudioDurationSec)}) · Drag Song Start in timeline`;
+}
+
+function setBpmDetectionResult(message) {
+  document.getElementById('bpm-detect-result').textContent = message;
+}
+
+function updateBpmDetectionUi() {
+  const detectBtn = document.getElementById('detect-bpm-btn');
+  const hasAudio = loadedAudioDurationSec > 0 && loadedAudioBuffer != null;
+  detectBtn.disabled = !hasAudio || detectingBpm;
+  detectBtn.textContent = detectingBpm ? 'Detecting...' : 'Detect BPM';
+  if (!hasAudio) {
+    setBpmDetectionResult('—');
+  }
+}
+
+function updateAudioClearState() {
+  const clearBtn = document.getElementById('clear-audio-btn');
+  clearBtn.disabled = !loadedAudioDurationSec;
+}
+
+function cleanupAudioUrl() {
+  if (!audioObjectUrl) {
+    return;
+  }
+  URL.revokeObjectURL(audioObjectUrl);
+  audioObjectUrl = null;
+}
+
+function clearLoadedAudio() {
+  pause();
+  draggingSongStart = false;
+  document.body.style.cursor = '';
+  cleanupAudioUrl();
+  audioPlayer.removeAttribute('src');
+  audioPlayer.load();
+  loadedAudioName = '';
+  loadedAudioDurationSec = 0;
+  loadedAudioBuffer = null;
+  waveformPeaks = null;
+  waveformVersion += 1;
+  currentBeat = clampBeat(currentBeat);
+  updateAudioStatus();
+  updateAudioClearState();
+  updateAudioOffsetUi();
+  updateBpmDetectionUi();
+  refresh();
+}
+
+function ensureAudioContext() {
+  if (!audioCtx) {
+    const ContextCtor = window.AudioContext || window.webkitAudioContext;
+    if (!ContextCtor) {
+      throw new Error('This browser does not support audio decoding.');
+    }
+    audioCtx = new ContextCtor();
+  }
+  return audioCtx;
+}
+
+function buildWaveformPeaks(decodedBuffer, points) {
+  const channelCount = decodedBuffer.numberOfChannels;
+  const blockSize = Math.max(1, Math.floor(decodedBuffer.length / points));
+  const peaks = [];
+
+  for (let i = 0; i < points; i += 1) {
+    const start = i * blockSize;
+    const end = Math.min(start + blockSize, decodedBuffer.length);
+    let peak = 0;
+    for (let ch = 0; ch < channelCount; ch += 1) {
+      const channelData = decodedBuffer.getChannelData(ch);
+      for (let j = start; j < end; j += 1) {
+        const value = Math.abs(channelData[j]);
+        if (value > peak) {
+          peak = value;
+        }
+      }
+    }
+    peaks.push(peak);
+  }
+
+  return peaks;
+}
+
+async function loadAudioFile(file) {
+  const buffer = await file.arrayBuffer();
+  const context = ensureAudioContext();
+  const decoded = await context.decodeAudioData(buffer.slice(0));
+  if (!Number.isFinite(decoded.duration) || decoded.duration <= 0) {
+    throw new Error('The selected audio file has no playable duration.');
+  }
+
+  const points = Math.max(400, Math.min(8000, Math.floor(decoded.duration * 180)));
+  const peaks = buildWaveformPeaks(decoded, points);
+  const objectUrl = URL.createObjectURL(file);
+
+  pause();
+  draggingSongStart = false;
+  document.body.style.cursor = '';
+  cleanupAudioUrl();
+  audioObjectUrl = objectUrl;
+  audioPlayer.src = audioObjectUrl;
+  loadedAudioName = file.name;
+  loadedAudioDurationSec = decoded.duration;
+  expectedAudioFileName = loadedAudioName;
+  loadedAudioBuffer = decoded;
+  audioStartOffsetSec = clampAudioStartOffset(audioStartOffsetSec);
+  waveformPeaks = peaks;
+  waveformVersion += 1;
+  currentBeat = clampBeat(-timelineLeadInBeats());
+  updateAudioStatus();
+  updateAudioClearState();
+  updateAudioOffsetUi();
+  updateBpmDetectionUi();
+  setBpmDetectionResult('Click Detect BPM');
+  refresh();
+}
+
+async function detectBpmFromLoadedAudio() {
+  if (!loadedAudioBuffer) {
+    window.alert('Load an audio file first.');
+    return;
+  }
+  if (!window.BpmDetector || typeof window.BpmDetector.detectFromAudioBuffer !== 'function') {
+    window.alert('BPM detector is not available.');
+    return;
+  }
+
+  detectingBpm = true;
+  updateBpmDetectionUi();
+  try {
+    const result = await Promise.resolve(window.BpmDetector.detectFromAudioBuffer(loadedAudioBuffer, {
+      minBpm: 70,
+      maxBpm: 180,
+      analyzeSeconds: 90,
+    }));
+    const detectedBpm = Math.max(20, Math.min(400, Math.round(result.bpm)));
+    song.bpm = detectedBpm;
+    syncSongInputs();
+    currentBeat = clampBeat(currentBeat);
+    refresh();
+
+    const altCandidates = result.candidates
+      .map((candidate) => candidate.bpm)
+      .filter((bpm) => Math.round(bpm) !== detectedBpm)
+      .slice(0, 2)
+      .map((bpm) => String(Math.round(bpm)));
+    const confidencePct = Math.round(result.confidence * 100);
+    const altText = altCandidates.length ? ` · Alt: ${altCandidates.join(', ')}` : '';
+    setBpmDetectionResult(`Set to ${detectedBpm} BPM (${confidencePct}% conf)${altText}`);
+  } catch (error) {
+    setBpmDetectionResult('Detection failed');
+    window.alert(`Could not detect BPM: ${error.message}`);
+    console.error(error);
+  } finally {
+    detectingBpm = false;
+    updateBpmDetectionUi();
+  }
+}
 
 function syncSongInputs() {
   const titleInput = document.getElementById('song-title');
@@ -56,6 +335,10 @@ function sanitizeSong(rawSong) {
 
   const title = String(rawSong.title || '').trim() || 'Untitled Song';
   const bpm = Math.max(20, Math.min(400, parseInt(rawSong.bpm, 10) || 120));
+  const rawAudio = rawSong.audio && typeof rawSong.audio === 'object' ? rawSong.audio : {};
+  const parsedOffset = Number(rawAudio.startOffsetSec);
+  const audioStartOffset = Number.isFinite(parsedOffset) && parsedOffset >= 0 ? parsedOffset : 0;
+  const audioFileName = rawAudio.fileName ? String(rawAudio.fileName).trim() : '';
   const usedIds = new Set();
 
   const sections = rawSong.sections.map((section, index) => {
@@ -95,7 +378,13 @@ function sanitizeSong(rawSong) {
     };
   });
 
-  return { title, bpm, sections };
+  return {
+    title,
+    bpm,
+    sections,
+    audioStartOffset,
+    audioFileName,
+  };
 }
 
 function loadSongFromData(rawSong) {
@@ -104,7 +393,13 @@ function loadSongFromData(rawSong) {
   currentBeat = 0;
   startBeat = 0;
   startTime = null;
-  song = nextSong;
+  song = {
+    title: nextSong.title,
+    bpm: nextSong.bpm,
+    sections: nextSong.sections,
+  };
+  expectedAudioFileName = nextSong.audioFileName;
+  setAudioStartOffset(nextSong.audioStartOffset, { keepPlayback: false });
   nextId = song.sections.reduce((maxId, section) => Math.max(maxId, section.id), 0) + 1;
   syncSongInputs();
   refresh();
@@ -120,7 +415,16 @@ function buildSaveFileName() {
 }
 
 function saveSongToDisk() {
-  const json = JSON.stringify(song, null, 2);
+  const payload = {
+    title: song.title,
+    bpm: song.bpm,
+    sections: song.sections,
+    audio: {
+      startOffsetSec: Math.round(audioStartOffsetSec * 1000) / 1000,
+      fileName: loadedAudioName || expectedAudioFileName || '',
+    },
+  };
+  const json = JSON.stringify(payload, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
@@ -152,18 +456,23 @@ function fmtTime(seconds) {
 }
 
 function clampBeat(beat) {
-  return Math.max(0, Math.min(beat, totalBeats()));
+  const minBeat = -timelineLeadInBeats();
+  return Math.max(minBeat, Math.min(beat, totalTimelineBeats()));
 }
 
 function displayBeat() {
-  const total = totalBeats();
+  const total = totalTimelineBeats();
+  const minBeat = -timelineLeadInBeats();
   if (total <= 0) {
-    return 0;
+    return minBeat;
   }
-  return Math.min(currentBeat, total - 0.0001);
+  return Math.max(minBeat, Math.min(currentBeat, total - 0.0001));
 }
 
 function getSectionAt(beat) {
+  if (beat < 0) {
+    return null;
+  }
   let acc = 0;
   for (let i = 0; i < song.sections.length; i += 1) {
     const sec = song.sections[i];
@@ -177,7 +486,7 @@ function getSectionAt(beat) {
 }
 
 function getSongBarNumber(beat) {
-  const clamped = clampBeat(beat);
+  const clamped = Math.max(0, clampBeat(beat));
   let accBeats = 0;
   let accBars = 0;
   for (let i = 0; i < song.sections.length; i += 1) {
@@ -199,18 +508,25 @@ function setPlayButtonState() {
 }
 
 function tick(timestamp) {
-  if (startTime == null) {
-    startTime = timestamp;
-  }
+  const total = totalTimelineBeats();
+  let beat = currentBeat;
 
-  const bps = song.bpm / 60;
-  const beat = startBeat + ((timestamp - startTime) / 1000) * bps;
-  const total = totalBeats();
+  if (loadedAudioDurationSec > 0) {
+    beat = audioTimeToBeat(audioPlayer.currentTime || 0);
+  } else {
+    if (startTime == null) {
+      startTime = timestamp;
+    }
+    const bps = song.bpm / 60;
+    beat = startBeat + ((timestamp - startTime) / 1000) * bps;
+  }
 
   if (beat >= total) {
     currentBeat = total;
-    playing = false;
-    setPlayButtonState();
+    pause();
+    if (loadedAudioDurationSec > 0) {
+      audioPlayer.currentTime = Math.min(audioPlayer.duration || 0, beatToAudioTime(total));
+    }
     updatePlayhead();
     updateNowPlaying();
     return;
@@ -222,10 +538,23 @@ function tick(timestamp) {
   rafId = requestAnimationFrame(tick);
 }
 
-function play() {
-  if (currentBeat >= totalBeats()) {
-    currentBeat = 0;
+async function play() {
+  if (currentBeat >= totalTimelineBeats()) {
+    currentBeat = loadedAudioDurationSec > 0 ? -timelineLeadInBeats() : 0;
   }
+
+  if (loadedAudioDurationSec > 0) {
+    const nextTime = Math.min(loadedAudioDurationSec, Math.max(0, beatToAudioTime(currentBeat)));
+    audioPlayer.currentTime = nextTime;
+    try {
+      await audioPlayer.play();
+    } catch (error) {
+      window.alert('Could not start audio playback. Try loading another file.');
+      console.error(error);
+      return;
+    }
+  }
+
   playing = true;
   startBeat = currentBeat;
   startTime = null;
@@ -235,6 +564,9 @@ function play() {
 
 function pause() {
   playing = false;
+  if (loadedAudioDurationSec > 0) {
+    audioPlayer.pause();
+  }
   if (rafId != null) {
     cancelAnimationFrame(rafId);
     rafId = null;
@@ -244,13 +576,19 @@ function pause() {
 
 function stop() {
   pause();
-  currentBeat = 0;
+  currentBeat = loadedAudioDurationSec > 0 ? -timelineLeadInBeats() : 0;
+  if (loadedAudioDurationSec > 0) {
+    audioPlayer.currentTime = 0;
+  }
   updatePlayhead();
   updateNowPlaying();
 }
 
 function seekToBeat(beat) {
   currentBeat = clampBeat(beat);
+  if (loadedAudioDurationSec > 0) {
+    audioPlayer.currentTime = Math.min(loadedAudioDurationSec, Math.max(0, beatToAudioTime(currentBeat)));
+  }
   startBeat = currentBeat;
   startTime = null;
   updatePlayhead();
@@ -265,7 +603,7 @@ function updatePlayhead() {
   }
 
   const beat = displayBeat();
-  const px = bpx(beat);
+  const px = bpx(beat + timelineLeadInBeats());
   playhead.style.left = `${px}px`;
 
   const info = getSectionAt(beat);
@@ -297,14 +635,23 @@ function updateNowPlaying() {
   const progressLabel = document.getElementById('progress-label');
 
   if (!info) {
+    const tBeats = totalTimelineBeats() || 1;
+    const progressBeat = Math.max(0, beat);
     npSectionName.textContent = '—';
     npChords.textContent = '';
     npNextName.textContent = '—';
     npBarNum.textContent = '—';
     npBarTotal.textContent = '—';
     npBeatNum.textContent = '—';
-    progressFill.style.width = '0%';
-    progressLabel.textContent = 'Bar 1 / 1 · 0:00 / 0:00';
+    progressFill.style.width = `${(progressBeat / tBeats) * 100}%`;
+    progressLabel.textContent = `Bar — / ${totalBars()} · ${fmtTime((progressBeat * 60) / song.bpm)} / ${fmtTime((tBeats * 60) / song.bpm)}`;
+    document.querySelectorAll('.tl-section').forEach((el) => {
+      el.classList.remove('active');
+      el.classList.add('inactive');
+    });
+    document.querySelectorAll('.sidebar-chip').forEach((el) => {
+      el.classList.remove('active');
+    });
     return;
   }
 
@@ -334,10 +681,11 @@ function updateNowPlaying() {
     npNextName.style.color = 'var(--muted2)';
   }
 
-  const tBeats = totalBeats() || 1;
+  const tBeats = totalTimelineBeats() || 1;
   const songBar = Math.min(getSongBarNumber(beat), totalBars());
-  progressFill.style.width = `${(beat / tBeats) * 100}%`;
-  progressLabel.textContent = `Bar ${songBar} / ${totalBars()} · ${fmtTime((beat * 60) / song.bpm)} / ${fmtTime((tBeats * 60) / song.bpm)}`;
+  const progressBeat = Math.max(0, beat);
+  progressFill.style.width = `${(progressBeat / tBeats) * 100}%`;
+  progressLabel.textContent = `Bar ${songBar} / ${totalBars()} · ${fmtTime((progressBeat * 60) / song.bpm)} / ${fmtTime((tBeats * 60) / song.bpm)}`;
 
   const activeId = sec.id;
   document.querySelectorAll('.tl-section').forEach((el) => {
@@ -374,12 +722,57 @@ function renderRuler(total) {
   }
 }
 
+function renderWaveform(totalBeatsCount) {
+  const inner = document.getElementById('timeline-inner');
+  const canvas = document.createElement('canvas');
+  const widthPx = Math.max(2, Math.floor(bpx(totalBeatsCount)));
+  const heightPx = WAVEFORM_HEIGHT;
+  canvas.id = 'waveform-layer';
+  canvas.width = widthPx;
+  canvas.height = heightPx;
+  canvas.style.width = `${widthPx}px`;
+  canvas.style.height = `${heightPx}px`;
+  inner.appendChild(canvas);
+
+  const drawVersion = waveformVersion;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'rgba(8, 6, 4, 0.55)';
+  ctx.fillRect(0, 0, widthPx, heightPx);
+
+  if (!waveformPeaks || !waveformPeaks.length || loadedAudioDurationSec <= 0) {
+    const empty = document.createElement('div');
+    empty.id = 'waveform-empty';
+    empty.textContent = 'Load audio to display waveform';
+    inner.appendChild(empty);
+    return;
+  }
+
+  const audioBeats = Math.max(1, secondsToBeat(loadedAudioDurationSec));
+  const audioPx = Math.max(1, Math.floor(bpx(audioBeats)));
+  const centerY = Math.floor(heightPx / 2);
+  const maxBarHeight = Math.floor(heightPx * 0.44);
+  const sampleCount = waveformPeaks.length;
+
+  ctx.fillStyle = 'rgba(245, 158, 11, 0.9)';
+  for (let x = 0; x < audioPx; x += 1) {
+    if (drawVersion !== waveformVersion) {
+      return;
+    }
+    const sampleIndex = Math.min(sampleCount - 1, Math.floor((x / audioPx) * sampleCount));
+    const amp = waveformPeaks[sampleIndex];
+    const h = Math.max(1, Math.floor(amp * maxBarHeight));
+    ctx.fillRect(x, centerY - h, 1, h * 2);
+  }
+}
+
 function renderTimeline() {
   const inner = document.getElementById('timeline-inner');
-  const total = totalBeats();
+  const total = totalVisualTimelineBeats();
+  const leadIn = timelineLeadInBeats();
   inner.style.width = `${bpx(total) + 120}px`;
   inner.innerHTML = '';
   renderRuler(total);
+  renderWaveform(total);
 
   let acc = 0;
   song.sections.forEach((sec) => {
@@ -389,7 +782,7 @@ function renderTimeline() {
     const block = document.createElement('div');
     block.className = 'tl-section inactive';
     block.dataset.id = String(sec.id);
-    block.style.left = `${bpx(acc)}px`;
+    block.style.left = `${bpx(acc + leadIn)}px`;
     block.style.width = `${Math.max(width - 2, 20)}px`;
     block.style.background = color.fill;
     block.innerHTML = `
@@ -405,9 +798,26 @@ function renderTimeline() {
     acc += sec.bars * sec.bpb;
   });
 
+  if (loadedAudioDurationSec > 0) {
+    const marker = document.createElement('button');
+    marker.type = 'button';
+    marker.id = 'song-start-marker';
+    marker.title = 'Drag to line up where bar 1 starts in the audio';
+    marker.style.left = `${bpx(leadIn)}px`;
+    marker.onmousedown = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      beginSongStartDrag(event);
+    };
+    marker.onclick = (event) => {
+      event.stopPropagation();
+    };
+    inner.appendChild(marker);
+  }
+
   const playhead = document.createElement('div');
   playhead.id = 'playhead';
-  playhead.style.left = `${bpx(currentBeat)}px`;
+  playhead.style.left = `${bpx(currentBeat + leadIn)}px`;
   playhead.innerHTML = '<div id="playhead-label">—</div>';
   inner.appendChild(playhead);
 }
@@ -581,11 +991,12 @@ document.getElementById('stop-btn').onclick = stop;
 document.getElementById('bpm-input').oninput = (event) => {
   const nextBpm = Math.max(20, Math.min(400, parseInt(event.target.value, 10) || 60));
   song.bpm = nextBpm;
+  currentBeat = clampBeat(currentBeat);
+  refresh();
   if (playing) {
     pause();
     play();
   }
-  updateNowPlaying();
 };
 
 document.getElementById('song-title').oninput = (event) => {
@@ -593,6 +1004,29 @@ document.getElementById('song-title').oninput = (event) => {
 };
 
 document.getElementById('save-song-btn').onclick = saveSongToDisk;
+
+document.getElementById('load-audio-btn').onclick = () => {
+  const input = document.getElementById('load-audio-input');
+  input.value = '';
+  input.click();
+};
+
+document.getElementById('clear-audio-btn').onclick = clearLoadedAudio;
+document.getElementById('detect-bpm-btn').onclick = detectBpmFromLoadedAudio;
+
+document.getElementById('load-audio-input').onchange = async (event) => {
+  const file = event.target.files && event.target.files[0];
+  if (!file) {
+    return;
+  }
+
+  try {
+    await loadAudioFile(file);
+  } catch (error) {
+    window.alert(`Could not load audio file: ${error.message}`);
+    console.error(error);
+  }
+};
 
 document.getElementById('load-song-btn').onclick = () => {
   const loadInput = document.getElementById('load-song-input');
@@ -643,9 +1077,37 @@ document.getElementById('timeline-wrap').onclick = (event) => {
   const wrap = document.getElementById('timeline-wrap');
   const rect = wrap.getBoundingClientRect();
   const x = event.clientX - rect.left + wrap.scrollLeft;
-  seekToBeat(x / PX_PER_BEAT);
+  seekToBeat((x / PX_PER_BEAT) - timelineLeadInBeats());
 };
+
+window.addEventListener('mousemove', (event) => {
+  if (!draggingSongStart) {
+    return;
+  }
+  updateSongStartFromPointer(event.clientX);
+});
+
+window.addEventListener('mouseup', () => {
+  if (!draggingSongStart) {
+    return;
+  }
+  draggingSongStart = false;
+  document.body.style.cursor = '';
+});
+
+audioPlayer.onended = () => {
+  currentBeat = clampBeat(audioTimeToBeat(audioPlayer.duration || 0));
+  pause();
+  updatePlayhead();
+  updateNowPlaying();
+};
+
+window.addEventListener('beforeunload', cleanupAudioUrl);
 
 setPlayButtonState();
 syncSongInputs();
+updateAudioStatus();
+updateAudioClearState();
+updateAudioOffsetUi();
+updateBpmDetectionUi();
 refresh();
