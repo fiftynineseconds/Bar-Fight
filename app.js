@@ -1,4 +1,6 @@
 const PX_PER_BEAT = 40;
+const SECTION_RESIZE_BEAT_STEP = 1;
+const SECTION_MAX_BARS = 64;
 
 const ICON_PLAY = '<svg width="11" height="13" viewBox="0 0 11 13" fill="currentColor" aria-hidden="true"><path d="M1.5 1.5l8 5-8 5z"></path></svg>';
 const ICON_PAUSE = '<svg width="11" height="13" viewBox="0 0 11 13" fill="currentColor" aria-hidden="true"><rect x="1" y="1" width="3" height="11" rx="1"></rect><rect x="7" y="1" width="3" height="11" rx="1"></rect></svg>';
@@ -18,6 +20,35 @@ const TYPES = Object.keys(COLORS);
 
 // Quarter-note beats per bar — the unit all timing math works in (BPM = quarter notes/min)
 function secQpb(sec) { return sec.bpb * 4 / sec.den; }
+
+function roundToStep(value, step) {
+  if (!Number.isFinite(value) || !Number.isFinite(step) || step <= 0) {
+    return value;
+  }
+  return Math.round(value / step) * step;
+}
+
+function getSectionBarStep(sec) {
+  return 1 / Math.max(1, secQpb(sec));
+}
+
+function normalizeSectionBars(rawBars, sec) {
+  const step = getSectionBarStep(sec);
+  const bars = Number(rawBars);
+  if (!Number.isFinite(bars)) {
+    return step;
+  }
+  const quantized = roundToStep(bars, step);
+  return Math.max(step, Math.min(SECTION_MAX_BARS, quantized));
+}
+
+function formatBars(value) {
+  const rounded = Math.round(Number(value) * 100) / 100;
+  if (!Number.isFinite(rounded)) {
+    return '0';
+  }
+  return Number.isInteger(rounded) ? String(rounded) : String(rounded).replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
+}
 
 let song = {
   title: 'New Song',
@@ -356,11 +387,6 @@ function sanitizeSong(rawSong) {
       throw new Error(`Section ${index + 1} has an unsupported type: ${section.type}`);
     }
 
-    const bars = parseInt(section.bars, 10);
-    if (!Number.isInteger(bars) || bars < 1) {
-      throw new Error(`Section ${index + 1} has an invalid bar count.`);
-    }
-
     const bpb = parseInt(section.bpb, 10);
     if (!Number.isInteger(bpb) || bpb < 1 || bpb > 16) {
       throw new Error(`Section ${index + 1} has an invalid time signature numerator.`);
@@ -368,6 +394,12 @@ function sanitizeSong(rawSong) {
 
     const rawDen = parseInt(section.den, 10);
     const den = [2, 4, 8, 16].includes(rawDen) ? rawDen : 4;
+
+    const parsedBars = Number(section.bars);
+    if (!Number.isFinite(parsedBars) || parsedBars <= 0) {
+      throw new Error(`Section ${index + 1} has an invalid bar count.`);
+    }
+    const bars = normalizeSectionBars(parsedBars, { bpb, den });
 
     let id = Number(section.id);
     if (!Number.isInteger(id) || id < 1 || usedIds.has(id)) {
@@ -557,8 +589,8 @@ function updateSectionResize(clientX) {
   }
 
   const pointerBeat = clientXToTimelineBeat(clientX);
-  const deltaBars = Math.round((pointerBeat - boundaryBeat) / beatsPerBar);
-  const nextBars = Math.max(1, Math.min(64, startBars + deltaBars));
+  const deltaBeats = roundToStep(pointerBeat - boundaryBeat, SECTION_RESIZE_BEAT_STEP);
+  const nextBars = normalizeSectionBars(startBars + (deltaBeats / beatsPerBar), targetSection);
   if (nextBars !== targetSection.bars) {
     targetSection.bars = nextBars;
     currentBeat = clampBeat(currentBeat);
@@ -576,7 +608,7 @@ function endSectionInteraction() {
 }
 
 function totalBars() {
-  return song.sections.reduce((sum, sec) => sum + sec.bars, 0);
+  return Math.round(song.sections.reduce((sum, sec) => sum + sec.bars, 0) * 1000) / 1000;
 }
 
 function bpx(beats) {
@@ -611,7 +643,7 @@ function renderPrintView() {
   subtitleEl.textContent = `BPM ${song.bpm}`;
   bpmEl.textContent = String(song.bpm);
   sectionsEl.textContent = String(song.sections.length);
-  barsEl.textContent = String(bars);
+  barsEl.textContent = formatBars(bars);
   durationEl.textContent = fmtTime(durationSec);
 
   listEl.innerHTML = '';
@@ -633,7 +665,7 @@ function renderPrintView() {
 
     const meta = document.createElement('span');
     meta.className = 'print-section-meta';
-    meta.textContent = `${sec.bars} bars · ${sec.bpb}/${sec.den}`;
+    meta.textContent = `${formatBars(sec.bars)} bars · ${sec.bpb}/${sec.den}`;
 
     head.appendChild(dot);
     head.appendChild(name);
@@ -859,7 +891,7 @@ function updateNowPlaying() {
     npBarTotal.textContent = '—';
     npBeatNum.textContent = '—';
     progressFill.style.width = `${(progressBeat / tBeats) * 100}%`;
-    progressLabel.textContent = `Bar — / ${totalBars()} · ${fmtTime((progressBeat * 60) / song.bpm)} / ${fmtTime((tBeats * 60) / song.bpm)}`;
+    progressLabel.textContent = `Bar — / ${formatBars(totalBars())} · ${fmtTime((progressBeat * 60) / song.bpm)} / ${fmtTime((tBeats * 60) / song.bpm)}`;
     document.querySelectorAll('.tl-section').forEach((el) => {
       el.classList.remove('active');
       el.classList.add('inactive');
@@ -882,7 +914,7 @@ function updateNowPlaying() {
   npChords.style.color = color.text;
   npChords.textContent = sec.chords || '—';
   npBarNum.textContent = String(bar);
-  npBarTotal.textContent = String(sec.bars);
+  npBarTotal.textContent = formatBars(sec.bars);
   npBeatNum.textContent = String(beatInBar);
 
   if (nextSec) {
@@ -900,7 +932,7 @@ function updateNowPlaying() {
   const songBar = Math.min(getSongBarNumber(beat), totalBars());
   const progressBeat = Math.max(0, beat);
   progressFill.style.width = `${(progressBeat / tBeats) * 100}%`;
-  progressLabel.textContent = `Bar ${songBar} / ${totalBars()} · ${fmtTime((progressBeat * 60) / song.bpm)} / ${fmtTime((tBeats * 60) / song.bpm)}`;
+  progressLabel.textContent = `Bar ${formatBars(songBar)} / ${formatBars(totalBars())} · ${fmtTime((progressBeat * 60) / song.bpm)} / ${fmtTime((tBeats * 60) / song.bpm)}`;
 
   const activeId = sec.id;
   document.querySelectorAll('.tl-section').forEach((el) => {
@@ -1007,7 +1039,7 @@ function renderTimeline() {
       <div class="tl-section-handle left" aria-hidden="true"></div>
       <div class="tl-section-body">
         <div class="tl-section-name" style="color:${color.text}">${sec.type}</div>
-        <div class="tl-section-bars" style="color:${color.text}">${sec.bars} bars · ${sec.bpb}/${sec.den}</div>
+        <div class="tl-section-bars" style="color:${color.text}">${formatBars(sec.bars)} bars · ${sec.bpb}/${sec.den}</div>
         <div class="tl-section-chords" style="color:${color.text}">${sec.chords || '—'}</div>
       </div>
       <div class="tl-section-handle right" aria-hidden="true"></div>
@@ -1088,7 +1120,7 @@ function renderSidebar() {
     chip.innerHTML = `
       <span class="chip-dot" style="background:${color.fill}; color:${color.fill};"></span>
       ${sec.type}
-      <span class="chip-bars">${sec.bars}</span>
+      <span class="chip-bars">${formatBars(sec.bars)}</span>
     `;
     const sectionStart = acc;
     chip.onclick = () => seekToBeat(sectionStart);
@@ -1149,11 +1181,13 @@ function renderEditor() {
     const barsInput = document.createElement('input');
     barsInput.className = 'num-in';
     barsInput.type = 'number';
-    barsInput.min = '1';
-    barsInput.max = '64';
-    barsInput.value = String(sec.bars);
+    barsInput.min = String(getSectionBarStep(sec));
+    barsInput.max = String(SECTION_MAX_BARS);
+    barsInput.step = String(getSectionBarStep(sec));
+    barsInput.value = formatBars(sec.bars);
     barsInput.onchange = () => {
-      sec.bars = Math.max(1, parseInt(barsInput.value, 10) || 1);
+      sec.bars = normalizeSectionBars(parseFloat(barsInput.value), sec);
+      barsInput.value = formatBars(sec.bars);
       refresh();
     };
     barsGroup.appendChild(barsInput);
@@ -1190,6 +1224,7 @@ function renderEditor() {
     const onTimeSigChange = () => {
       sec.bpb = parseInt(numSel.value, 10);
       sec.den = parseInt(denSel.value, 10);
+      sec.bars = normalizeSectionBars(sec.bars, sec);
       refresh();
     };
     numSel.onchange = onTimeSigChange;
