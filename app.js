@@ -1237,10 +1237,25 @@ function onTap() {
 document.getElementById('tap-btn').onclick = onTap;
 
 document.addEventListener('keydown', (event) => {
+  const active = document.activeElement;
+  const tag = active ? active.tagName : '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+  if (event.key === ' ' || event.code === 'Space') {
+    if (event.repeat) {
+      event.preventDefault();
+      return;
+    }
+    event.preventDefault();
+    if (playing) {
+      pause();
+    } else {
+      play();
+    }
+    return;
+  }
+
   if (event.key === 't' || event.key === 'T') {
-    const active = document.activeElement;
-    const tag = active ? active.tagName : '';
-    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
     event.preventDefault();
     onTap();
   }
