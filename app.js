@@ -1549,6 +1549,7 @@ document.getElementById('load-audio-btn').onclick = () => {
 };
 
 document.getElementById('clear-audio-btn').onclick = clearLoadedAudio;
+document.getElementById('clear-song-btn').onclick = clearSong;
 document.getElementById('detect-bpm-btn').onclick = detectBpmFromLoadedAudio;
 
 document.getElementById('load-audio-input').onchange = async (event) => {
@@ -1627,6 +1628,19 @@ document.getElementById('print-view-overlay').onclick = (event) => {
     closePrintView();
   }
 };
+
+function clearSong() {
+  if (!window.confirm('Start a new song? All sections, the title, and any loaded audio will be cleared.')) {
+    return;
+  }
+  song = { title: 'New Song', bpm: 120, sections: [{ id: 1, type: 'Verse', bars: 4, bpb: 4, den: 4, chords: '' }] };
+  nextId = 2;
+  currentBeat = 0;
+  startBeat = 0;
+  startTime = null;
+  syncSongInputs();
+  clearLoadedAudio();
+}
 
 function addSection() {
   song.sections.push({ id: nextId, type: 'Verse', bars: 4, bpb: 4, den: 4, chords: '' });

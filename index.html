@@ -93,6 +93,7 @@
     }
     .song-file-btn:hover { background: var(--bg4); }
     .song-file-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    #clear-song-btn:hover { background: rgba(180,50,30,0.25); color: #f87171; border-color: rgba(180,50,30,0.6); }
     #audio-status {
       min-width: 150px; max-width: 260px; color: var(--muted);
       font-size: 11px; font-family: var(--font-mono); white-space: nowrap;
@@ -478,6 +479,7 @@
         <button id="load-song-btn" class="song-file-btn" title="Load a song JSON file">Load Song</button>
         <button id="load-song-url-btn" class="song-file-btn" title="Load a song JSON from a server URL">Load URL</button>
         <input id="load-song-input" type="file" accept="application/json,.json" hidden />
+        <button id="clear-song-btn" class="song-file-btn" title="Start a new song (clears sections, title, and audio)">Clear Song</button>
       </div>
       <div id="audio-status">No audio loaded</div>
       <div id="bpm-detect-wrap">
