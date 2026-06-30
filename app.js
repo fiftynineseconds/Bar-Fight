@@ -559,10 +559,20 @@ async function loadSongFromData(rawSong, options = {}) {
   refresh();
 }
 
+function toRawGithubUrl(url) {
+  // Convert github.com blob URLs to raw.githubusercontent.com so CORS works
+  const match = url.match(/^https?:\/\/github\.com\/([^/]+\/[^/]+)\/blob\/(.+)$/);
+  if (match) {
+    return `https://raw.githubusercontent.com/${match[1]}/${match[2]}`;
+  }
+  return url;
+}
+
 async function fetchSongJsonFromUrl(songUrl) {
+  const fetchUrl = toRawGithubUrl(songUrl);
   let response;
   try {
-    response = await fetch(songUrl, { cache: 'no-store' });
+    response = await fetch(fetchUrl, { cache: 'no-store' });
   } catch (error) {
     throw new Error(`Network error loading song URL: ${error.message}`);
   }
