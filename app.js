@@ -85,9 +85,37 @@ let draggingSongStart = false;
 let sectionInteraction = null;
 let suppressTimelineClick = false;
 let loadedAudioBuffer = null;
+let loadedAudioBlob = null;
+let loadedAudioSourceUrl = '';
 let detectingBpm = false;
 let expectedAudioFileName = '';
 let printViewOpen = false;
+
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('Could not encode audio for export.'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+function dataUrlToFile(dataUrl, fileName, mimeTypeHint = '') {
+  const match = /^data:([^;,]+)?(?:;charset=[^;,]+)?;base64,(.+)$/i.exec(String(dataUrl || ''));
+  if (!match) {
+    throw new Error('Embedded audio data is not a valid base64 data URL.');
+  }
+
+  const mimeType = mimeTypeHint || match[1] || 'application/octet-stream';
+  const bytesRaw = atob(match[2]);
+  const bytes = new Uint8Array(bytesRaw.length);
+  for (let i = 0; i < bytesRaw.length; i += 1) {
+    bytes[i] = bytesRaw.charCodeAt(i);
+  }
+
+  const safeName = (fileName && String(fileName).trim()) || 'embedded-audio';
+  return new File([bytes], safeName, { type: mimeType });
+}
 
 function availableAudioDurationSec() {
   return Math.max(0, loadedAudioDurationSec - audioStartOffsetSec);
@@ -233,6 +261,8 @@ function clearLoadedAudio() {
   loadedAudioName = '';
   loadedAudioDurationSec = 0;
   loadedAudioBuffer = null;
+  loadedAudioBlob = null;
+  loadedAudioSourceUrl = '';
   waveformPeaks = null;
   waveformVersion += 1;
   currentBeat = clampBeat(currentBeat);
@@ -300,6 +330,8 @@ async function loadAudioFile(file) {
   loadedAudioDurationSec = decoded.duration;
   expectedAudioFileName = loadedAudioName;
   loadedAudioBuffer = decoded;
+  loadedAudioBlob = file;
+  loadedAudioSourceUrl = '';
   audioStartOffsetSec = clampAudioStartOffset(audioStartOffsetSec);
   waveformPeaks = peaks;
   waveformVersion += 1;
@@ -310,6 +342,34 @@ async function loadAudioFile(file) {
   updateBpmDetectionUi();
   setBpmDetectionResult('Click Detect BPM');
   refresh();
+}
+
+async function loadAudioFromUrl(audioUrl, fileNameHint = '') {
+  let response;
+  try {
+    response = await fetch(audioUrl);
+  } catch (error) {
+    throw new Error(`Network error loading audio URL: ${error.message}`);
+  }
+
+  if (!response.ok) {
+    throw new Error(`Audio URL request failed (${response.status})`);
+  }
+
+  const blob = await response.blob();
+  const fileNameFromUrl = (() => {
+    try {
+      const pathname = new URL(audioUrl, window.location.href).pathname;
+      const last = pathname.split('/').pop();
+      return last ? decodeURIComponent(last) : '';
+    } catch (error) {
+      return '';
+    }
+  })();
+  const fileName = fileNameHint || fileNameFromUrl || 'server-audio';
+  const file = new File([blob], fileName, { type: blob.type || 'application/octet-stream' });
+  await loadAudioFile(file);
+  loadedAudioSourceUrl = audioUrl;
 }
 
 async function detectBpmFromLoadedAudio() {
@@ -376,6 +436,10 @@ function sanitizeSong(rawSong) {
   const parsedOffset = Number(rawAudio.startOffsetSec);
   const audioStartOffset = Number.isFinite(parsedOffset) && parsedOffset >= 0 ? parsedOffset : 0;
   const audioFileName = rawAudio.fileName ? String(rawAudio.fileName).trim() : '';
+  const audioUrl = rawAudio.url ? String(rawAudio.url).trim() : '';
+  const rawEmbeddedAudio = rawAudio.embedded && typeof rawAudio.embedded === 'object' ? rawAudio.embedded : {};
+  const audioEmbeddedDataUrl = typeof rawEmbeddedAudio.dataUrl === 'string' ? rawEmbeddedAudio.dataUrl : '';
+  const audioEmbeddedMimeType = typeof rawEmbeddedAudio.mimeType === 'string' ? rawEmbeddedAudio.mimeType : '';
   const usedIds = new Set();
 
   const sections = rawSong.sections.map((section, index) => {
@@ -426,10 +490,29 @@ function sanitizeSong(rawSong) {
     sections,
     audioStartOffset,
     audioFileName,
+    audioUrl,
+    audioEmbeddedDataUrl,
+    audioEmbeddedMimeType,
   };
 }
 
-function loadSongFromData(rawSong) {
+function resolveUrlWithBase(maybeRelativeUrl, baseUrl = '') {
+  const trimmed = String(maybeRelativeUrl || '').trim();
+  if (!trimmed) {
+    return '';
+  }
+  if (!baseUrl) {
+    return trimmed;
+  }
+  try {
+    return new URL(trimmed, baseUrl).href;
+  } catch (error) {
+    return trimmed;
+  }
+}
+
+async function loadSongFromData(rawSong, options = {}) {
+  const { sourceUrl = '' } = options;
   const nextSong = sanitizeSong(rawSong);
   pause();
   currentBeat = 0;
@@ -440,11 +523,63 @@ function loadSongFromData(rawSong) {
     bpm: nextSong.bpm,
     sections: nextSong.sections,
   };
+
+  clearLoadedAudio();
   expectedAudioFileName = nextSong.audioFileName;
+
+  if (nextSong.audioEmbeddedDataUrl) {
+    let embeddedFile;
+    try {
+      embeddedFile = dataUrlToFile(
+        nextSong.audioEmbeddedDataUrl,
+        nextSong.audioFileName || 'embedded-audio',
+        nextSong.audioEmbeddedMimeType,
+      );
+    } catch (error) {
+      throw new Error(`Could not decode embedded audio: ${error.message}`);
+    }
+
+    try {
+      await loadAudioFile(embeddedFile);
+    } catch (error) {
+      throw new Error(`Could not load embedded audio: ${error.message}`);
+    }
+  } else if (nextSong.audioUrl) {
+    const resolvedAudioUrl = resolveUrlWithBase(nextSong.audioUrl, sourceUrl);
+    try {
+      await loadAudioFromUrl(resolvedAudioUrl, nextSong.audioFileName);
+    } catch (error) {
+      throw new Error(`Could not load audio from URL: ${error.message}`);
+    }
+  }
+
   setAudioStartOffset(nextSong.audioStartOffset, { keepPlayback: false });
   nextId = song.sections.reduce((maxId, section) => Math.max(maxId, section.id), 0) + 1;
   syncSongInputs();
   refresh();
+}
+
+async function fetchSongJsonFromUrl(songUrl) {
+  let response;
+  try {
+    response = await fetch(songUrl, { cache: 'no-store' });
+  } catch (error) {
+    throw new Error(`Network error loading song URL: ${error.message}`);
+  }
+
+  if (!response.ok) {
+    throw new Error(`Song URL request failed (${response.status})`);
+  }
+
+  let parsed;
+  try {
+    parsed = await response.json();
+  } catch (error) {
+    throw new Error('Song URL did not return valid JSON.');
+  }
+
+  const resolvedSongUrl = resolveUrlWithBase(songUrl, window.location.href);
+  await loadSongFromData(parsed, { sourceUrl: resolvedSongUrl });
 }
 
 function buildSaveFileName() {
@@ -456,26 +591,41 @@ function buildSaveFileName() {
   return `${cleanedTitle || 'song'}.json`;
 }
 
-function saveSongToDisk() {
-  const payload = {
-    title: song.title,
-    bpm: song.bpm,
-    sections: song.sections,
-    audio: {
-      startOffsetSec: Math.round(audioStartOffsetSec * 1000) / 1000,
-      fileName: loadedAudioName || expectedAudioFileName || '',
-    },
-  };
-  const json = JSON.stringify(payload, null, 2);
-  const blob = new Blob([json], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = buildSaveFileName();
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
-  URL.revokeObjectURL(url);
+async function saveSongToDisk() {
+  try {
+    const payload = {
+      title: song.title,
+      bpm: song.bpm,
+      sections: song.sections,
+      audio: {
+        startOffsetSec: Math.round(audioStartOffsetSec * 1000) / 1000,
+        fileName: loadedAudioName || expectedAudioFileName || '',
+        url: loadedAudioSourceUrl || '',
+      },
+    };
+
+    if (loadedAudioBlob) {
+      payload.audio.embedded = {
+        fileName: loadedAudioName || expectedAudioFileName || 'embedded-audio',
+        mimeType: loadedAudioBlob.type || '',
+        dataUrl: await blobToDataUrl(loadedAudioBlob),
+      };
+    }
+
+    const json = JSON.stringify(payload, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = buildSaveFileName();
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    window.alert(`Could not save song file: ${error.message}`);
+    console.error(error);
+  }
 }
 
 function totalBeats() {
@@ -1438,7 +1588,22 @@ document.getElementById('load-song-input').onchange = async (event) => {
   }
 
   try {
-    loadSongFromData(parsed);
+    await loadSongFromData(parsed);
+  } catch (error) {
+    window.alert(error.message);
+    console.error(error);
+  }
+};
+
+document.getElementById('load-song-url-btn').onclick = async () => {
+  const defaultUrl = new URLSearchParams(window.location.search).get('song') || '';
+  const userUrl = window.prompt('Enter song JSON URL', defaultUrl);
+  if (!userUrl) {
+    return;
+  }
+
+  try {
+    await fetchSongJsonFromUrl(userUrl);
   } catch (error) {
     window.alert(error.message);
     console.error(error);
@@ -1529,3 +1694,17 @@ updateAudioClearState();
 updateAudioOffsetUi();
 updateBpmDetectionUi();
 refresh();
+
+(async () => {
+  const songUrl = new URLSearchParams(window.location.search).get('song');
+  if (!songUrl) {
+    return;
+  }
+
+  try {
+    await fetchSongJsonFromUrl(songUrl);
+  } catch (error) {
+    window.alert(error.message);
+    console.error(error);
+  }
+})();

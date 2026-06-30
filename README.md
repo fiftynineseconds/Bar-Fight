@@ -11,10 +11,30 @@
 - Hit play — a beat-locked playhead scrolls across the timeline in real time
 - A header bar shows the current section, bar number, beat, and chords at a glance, with a "Next: [section]" preview
 - Click anywhere on the timeline to seek
-- Save songs to a JSON file and load them back from disk
+- Save songs to a portable JSON file (including currently loaded audio) and load them back from disk
+- Load song JSON from a server URL (toolbar button or `?song=` query param)
 - Optionally load audio, view waveform, and drag a timeline "Song Start" marker to line sections up visually
 - Detect BPM from loaded audio and apply it to the timeline tempo
-- Song JSON now includes optional `audio` metadata (`startOffsetSec`, `fileName`) for alignment recall
+- Song JSON now includes optional `audio` metadata (`startOffsetSec`, `fileName`, `url`) and optional embedded base64 audio data for one-file portability
+
+### Server-Load JSON Format
+
+`audio.embedded` takes priority when present. If not present, `audio.url` is loaded (resolved relative to the song JSON URL).
+
+```json
+{
+	"title": "My Song",
+	"bpm": 120,
+	"sections": [
+		{ "id": 1, "type": "Intro", "bars": 4, "bpb": 4, "den": 4, "chords": "E A B A" }
+	],
+	"audio": {
+		"startOffsetSec": 1.25,
+		"fileName": "song-mix.mp3",
+		"url": "./song-mix.mp3"
+	}
+}
+```
 
 ## Stack & Structure
 
