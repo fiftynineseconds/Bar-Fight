@@ -77,6 +77,12 @@
     }
     #editor-toggle:hover { background: var(--bg4); }
     #editor-toggle.active { background: rgba(245,158,11,0.15); border-color: var(--amber); color: var(--amber); }
+    #print-view-btn {
+      display: flex; align-items: center; gap: 6px; padding: 8px 15px; background: var(--bg3);
+      border: 1px solid var(--border-hi); border-radius: 999px; color: var(--text2);
+      font-size: 13px; font-weight: 600; font-family: var(--font-ui); cursor: pointer; white-space: nowrap;
+    }
+    #print-view-btn:hover { background: var(--bg4); }
     #song-file-actions { display: flex; align-items: center; gap: 6px; }
     .song-file-btn {
       display: flex; align-items: center; gap: 6px; padding: 8px 12px;
@@ -313,6 +319,73 @@
       font-size: 15px; border-radius: 6px; transition: background 0.1s, color 0.1s; flex-shrink: 0;
     }
     .rm-btn:hover { background: rgba(180,50,30,0.2); color: #f87171; }
+    #print-view-overlay {
+      position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.7);
+      display: flex; justify-content: center; align-items: flex-start; overflow-y: auto;
+      opacity: 0; pointer-events: none; transition: opacity 0.16s;
+      padding: 28px 18px;
+    }
+    #print-view-overlay.open { opacity: 1; pointer-events: auto; }
+    #print-view-sheet {
+      width: min(980px, 100%); background: #fbf5e7; color: #2d2315;
+      border-radius: 12px; border: 1px solid #d8c7a6; box-shadow: 0 20px 40px rgba(0,0,0,0.35);
+      padding: 24px;
+    }
+    #print-view-head {
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 14px;
+      border-bottom: 2px solid #e0d1b3; padding-bottom: 14px; margin-bottom: 14px;
+    }
+    #print-song-title {
+      font-size: 28px; font-weight: 800; letter-spacing: -0.02em;
+    }
+    #print-song-subtitle {
+      margin-top: 4px; font-size: 13px; color: #705938; font-family: var(--font-mono);
+    }
+    #print-actions { display: flex; align-items: center; gap: 8px; }
+    .print-action-btn {
+      border: 1px solid #b99a6d; background: #f1dfba; color: #3d2d16;
+      border-radius: 999px; padding: 8px 14px; font-size: 12px; font-weight: 700; letter-spacing: 0.05em;
+      text-transform: uppercase; cursor: pointer;
+    }
+    .print-action-btn:hover { background: #e9d29f; }
+    #print-song-stats {
+      display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px;
+      margin-bottom: 14px;
+    }
+    .print-stat {
+      border: 1px solid #dfcfb0; border-radius: 8px; padding: 9px 10px; background: #fffaf0;
+    }
+    .print-stat-label {
+      font-size: 10px; color: #7b6442; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+    }
+    .print-stat-value {
+      margin-top: 4px; font-size: 22px; line-height: 1; font-weight: 800;
+      font-family: var(--font-mono); color: #2f2415;
+    }
+    #print-sections-list {
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .print-section-row {
+      border: 1px solid #d6c4a3; border-radius: 10px; background: #fffefb;
+      padding: 10px 12px; break-inside: avoid;
+    }
+    .print-section-head {
+      display: flex; align-items: center; gap: 9px;
+    }
+    .print-section-dot {
+      width: 12px; height: 12px; border-radius: 999px; flex-shrink: 0;
+      border: 1px solid rgba(0,0,0,0.2);
+    }
+    .print-section-name {
+      font-size: 16px; font-weight: 800; letter-spacing: 0.03em;
+    }
+    .print-section-meta {
+      margin-left: auto; color: #7a6342; font-family: var(--font-mono); font-size: 12px;
+    }
+    .print-section-chords {
+      margin-top: 8px; font-family: var(--font-mono); font-size: 14px;
+      color: #3f311d; white-space: pre-wrap;
+    }
     @media (max-width: 1200px) {
       #progress-wrap { display: none; }
       #sidebar { width: 164px; }
@@ -330,6 +403,28 @@
       #np-position { width: 140px; }
       #timeline-wrap { height: 230px; }
       .tl-section { height: 180px; }
+    }
+    @media (max-width: 900px) {
+      #print-view-head { flex-direction: column; }
+      #print-actions { width: 100%; }
+      #print-song-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media print {
+      body { background: #ffffff; color: #111111; padding: 0; overflow: visible; display: block; height: auto; }
+      #app-shell { display: none !important; }
+      #print-view-overlay {
+        position: static; inset: auto; background: transparent; opacity: 1 !important;
+        pointer-events: auto; overflow: visible; padding: 0;
+      }
+      #print-view-sheet {
+        width: 100%; border: none; border-radius: 0; box-shadow: none;
+        background: #ffffff; color: #111111; padding: 0;
+      }
+      #print-actions { display: none !important; }
+      .print-section-row {
+        border-color: #bbbbbb;
+        page-break-inside: avoid;
+      }
     }
   </style>
 </head>
@@ -369,6 +464,14 @@
         <div id="bpm-detect-result">—</div>
       </div>
       <div class="spacer"></div>
+      <button id="print-view-btn" title="Open printable song view">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="2" y="1.5" width="10" height="4"></rect>
+          <rect x="2" y="8.5" width="10" height="4"></rect>
+          <line x1="4" y1="10.5" x2="10" y2="10.5"></line>
+        </svg>
+        Print View
+      </button>
       <button id="editor-toggle" class="active" title="Show or hide section editor">
         <svg width="13" height="10" viewBox="0 0 13 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
           <line x1="0" y1="1" x2="13" y2="1"></line>
@@ -417,6 +520,27 @@
           </div>
         </div>
       </div>
+    </div>
+  </div>
+  <div id="print-view-overlay" aria-hidden="true">
+    <div id="print-view-sheet" role="dialog" aria-modal="true" aria-labelledby="print-song-title">
+      <div id="print-view-head">
+        <div>
+          <div id="print-song-title">Song</div>
+          <div id="print-song-subtitle">BPM 120</div>
+        </div>
+        <div id="print-actions">
+          <button id="print-sheet-btn" class="print-action-btn" type="button">Print</button>
+          <button id="close-print-view-btn" class="print-action-btn" type="button">Close</button>
+        </div>
+      </div>
+      <div id="print-song-stats">
+        <div class="print-stat"><div class="print-stat-label">BPM</div><div class="print-stat-value" id="print-stat-bpm">0</div></div>
+        <div class="print-stat"><div class="print-stat-label">Sections</div><div class="print-stat-value" id="print-stat-sections">0</div></div>
+        <div class="print-stat"><div class="print-stat-label">Total Bars</div><div class="print-stat-value" id="print-stat-bars">0</div></div>
+        <div class="print-stat"><div class="print-stat-label">Duration</div><div class="print-stat-value" id="print-stat-duration">0:00</div></div>
+      </div>
+      <div id="print-sections-list"></div>
     </div>
   </div>
   <script src="bpm-detector.js"></script>

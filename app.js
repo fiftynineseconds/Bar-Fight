@@ -56,6 +56,7 @@ let suppressTimelineClick = false;
 let loadedAudioBuffer = null;
 let detectingBpm = false;
 let expectedAudioFileName = '';
+let printViewOpen = false;
 
 function availableAudioDurationSec() {
   return Math.max(0, loadedAudioDurationSec - audioStartOffsetSec);
@@ -587,6 +588,86 @@ function fmtTime(seconds) {
   const m = Math.floor(sec / 60);
   const s = String(sec % 60).padStart(2, '0');
   return `${m}:${s}`;
+}
+
+function renderPrintView() {
+  const titleEl = document.getElementById('print-song-title');
+  const subtitleEl = document.getElementById('print-song-subtitle');
+  const bpmEl = document.getElementById('print-stat-bpm');
+  const sectionsEl = document.getElementById('print-stat-sections');
+  const barsEl = document.getElementById('print-stat-bars');
+  const durationEl = document.getElementById('print-stat-duration');
+  const listEl = document.getElementById('print-sections-list');
+
+  if (!titleEl || !subtitleEl || !bpmEl || !sectionsEl || !barsEl || !durationEl || !listEl) {
+    return;
+  }
+
+  const bars = totalBars();
+  const beats = totalBeats();
+  const durationSec = (beats * 60) / song.bpm;
+
+  titleEl.textContent = song.title || 'Untitled Song';
+  subtitleEl.textContent = `BPM ${song.bpm}`;
+  bpmEl.textContent = String(song.bpm);
+  sectionsEl.textContent = String(song.sections.length);
+  barsEl.textContent = String(bars);
+  durationEl.textContent = fmtTime(durationSec);
+
+  listEl.innerHTML = '';
+  song.sections.forEach((sec, index) => {
+    const color = COLORS[sec.type] || { fill: '#6b7280', text: '#111827' };
+    const row = document.createElement('div');
+    row.className = 'print-section-row';
+
+    const head = document.createElement('div');
+    head.className = 'print-section-head';
+
+    const dot = document.createElement('span');
+    dot.className = 'print-section-dot';
+    dot.style.background = color.fill;
+
+    const name = document.createElement('span');
+    name.className = 'print-section-name';
+    name.textContent = `${index + 1}. ${sec.type}`;
+
+    const meta = document.createElement('span');
+    meta.className = 'print-section-meta';
+    meta.textContent = `${sec.bars} bars · ${sec.bpb}/${sec.den}`;
+
+    head.appendChild(dot);
+    head.appendChild(name);
+    head.appendChild(meta);
+
+    const chords = document.createElement('div');
+    chords.className = 'print-section-chords';
+    chords.textContent = sec.chords ? sec.chords : 'No chords entered';
+
+    row.appendChild(head);
+    row.appendChild(chords);
+    listEl.appendChild(row);
+  });
+}
+
+function openPrintView() {
+  const overlay = document.getElementById('print-view-overlay');
+  if (!overlay) {
+    return;
+  }
+  renderPrintView();
+  overlay.classList.add('open');
+  overlay.setAttribute('aria-hidden', 'false');
+  printViewOpen = true;
+}
+
+function closePrintView() {
+  const overlay = document.getElementById('print-view-overlay');
+  if (!overlay) {
+    return;
+  }
+  overlay.classList.remove('open');
+  overlay.setAttribute('aria-hidden', 'true');
+  printViewOpen = false;
 }
 
 function clampBeat(beat) {
@@ -1165,6 +1246,7 @@ function refresh() {
   renderTimeline();
   renderSidebar();
   renderEditor();
+  renderPrintView();
   updatePlayhead();
   updateNowPlaying();
 }
@@ -1237,6 +1319,12 @@ function onTap() {
 document.getElementById('tap-btn').onclick = onTap;
 
 document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && printViewOpen) {
+    event.preventDefault();
+    closePrintView();
+    return;
+  }
+
   const active = document.activeElement;
   const tag = active ? active.tagName : '';
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
@@ -1324,6 +1412,18 @@ document.getElementById('editor-toggle').onclick = () => {
   const editor = document.getElementById('editor');
   const hidden = editor.classList.toggle('hidden');
   document.getElementById('editor-toggle').classList.toggle('active', !hidden);
+};
+
+document.getElementById('print-view-btn').onclick = openPrintView;
+document.getElementById('close-print-view-btn').onclick = closePrintView;
+document.getElementById('print-sheet-btn').onclick = () => {
+  renderPrintView();
+  window.print();
+};
+document.getElementById('print-view-overlay').onclick = (event) => {
+  if (event.target.id === 'print-view-overlay') {
+    closePrintView();
+  }
 };
 
 function addSection() {
