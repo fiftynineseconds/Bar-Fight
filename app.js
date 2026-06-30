@@ -915,22 +915,24 @@ function updateNowPlaying() {
   });
 }
 
-function renderRuler(total) {
+function renderRuler(total, leadIn = 0) {
   const ruler = document.getElementById('ruler');
   ruler.innerHTML = '';
   ruler.style.width = `${bpx(total) + 120}px`;
 
-  for (let beat = 0; beat <= total; beat += 1) {
+  const songAlignedBeats = Math.max(0, total - leadIn);
+  for (let beat = 0; beat <= songAlignedBeats; beat += 1) {
+    const visualBeat = leadIn + beat;
     const isMajor = beat % 4 === 0;
     const tick = document.createElement('div');
     tick.className = `r-tick ${isMajor ? 'major' : 'minor'}`;
-    tick.style.left = `${bpx(beat)}px`;
+    tick.style.left = `${bpx(visualBeat)}px`;
     ruler.appendChild(tick);
 
     if (isMajor) {
       const mark = document.createElement('div');
       mark.className = 'r-mark';
-      mark.style.left = `${bpx(beat)}px`;
+      mark.style.left = `${bpx(visualBeat)}px`;
       mark.textContent = String(Math.floor(beat / 4) + 1);
       ruler.appendChild(mark);
     }
@@ -986,7 +988,7 @@ function renderTimeline() {
   const leadIn = timelineLeadInBeats();
   inner.style.width = `${bpx(total) + 120}px`;
   inner.innerHTML = '';
-  renderRuler(total);
+  renderRuler(total, leadIn);
   renderWaveform(total);
 
   let acc = 0;
