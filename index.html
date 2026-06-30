@@ -28,18 +28,19 @@
       box-shadow: 0 16px 32px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,230,180,0.04) inset;
     }
     #toolbar {
-      display: flex; align-items: center; gap: 12px; padding: 0 22px; height: 60px;
-      background: var(--bg2); border-bottom: 1px solid var(--border); flex-shrink: 0;
+      display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 10px 16px;
+      min-height: 60px; height: auto; background: var(--bg2); border-bottom: 1px solid var(--border); flex-shrink: 0;
       box-shadow: 0 1px 0 rgba(255,230,180,0.04) inset;
     }
     #song-title {
       font-size: 18px; font-weight: 700; background: transparent; border: none; color: var(--text);
       font-family: var(--font-ui); letter-spacing: -0.02em; outline: none; min-width: 120px;
       padding: 3px 0; border-bottom: 1px solid transparent; transition: border-color 0.15s;
+      flex: 0 1 220px;
     }
     #song-title:focus { border-bottom-color: var(--amber); }
     .t-sep { width: 1px; height: 30px; background: var(--border); flex-shrink: 0; margin: 0 6px; }
-    .spacer { flex: 1; }
+    .spacer { flex: 1 1 auto; min-width: 20px; }
     #transport {
       display: flex; align-items: center; gap: 4px; background: #120d06;
       border: 1px solid var(--border); border-radius: 10px; padding: 4px;
@@ -66,7 +67,7 @@
     }
     #bpm-input:focus { color: #fcd34d; }
     .bpm-label { font-size: 9px; font-weight: 700; letter-spacing: 0.2em; color: var(--muted2); text-transform: uppercase; margin-top: 1px; }
-    #progress-wrap { flex: 1; max-width: 280px; display: flex; flex-direction: column; gap: 3px; }
+    #progress-wrap { flex: 1 1 220px; min-width: 200px; max-width: 320px; display: flex; flex-direction: column; gap: 3px; }
     #progress-track { height: 7px; background: var(--bg4); border-radius: 3px; overflow: hidden; border: 1px solid var(--border); }
     #progress-fill { height: 100%; width: 0; background: linear-gradient(90deg, var(--amber-dim), var(--amber)); border-radius: 3px; }
     #progress-label { font-size: 11px; color: var(--muted); text-align: right; font-family: var(--font-mono); letter-spacing: 0.03em; }
@@ -83,7 +84,7 @@
       font-size: 13px; font-weight: 600; font-family: var(--font-ui); cursor: pointer; white-space: nowrap;
     }
     #print-view-btn:hover { background: var(--bg4); }
-    #song-file-actions { display: flex; align-items: center; gap: 6px; }
+    #song-file-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
     .song-file-btn {
       display: flex; align-items: center; gap: 6px; padding: 8px 12px;
       background: var(--bg3); border: 1px solid var(--border-hi); border-radius: 999px;
@@ -93,13 +94,15 @@
     .song-file-btn:hover { background: var(--bg4); }
     .song-file-btn:disabled { opacity: 0.45; cursor: not-allowed; }
     #audio-status {
-      min-width: 132px; max-width: 220px; color: var(--muted);
+      min-width: 150px; max-width: 260px; color: var(--muted);
       font-size: 11px; font-family: var(--font-mono); white-space: nowrap;
       overflow: hidden; text-overflow: ellipsis;
+      flex: 0 1 240px;
     }
     #bpm-detect-wrap {
       display: flex; align-items: center; gap: 8px;
       color: var(--muted); font-size: 11px; font-family: var(--font-mono);
+      flex-shrink: 0;
     }
     #detect-bpm-btn {
       background: var(--bg3); border: 1px solid var(--border-hi); border-radius: 999px;
@@ -397,7 +400,24 @@
       #np-next-wrap { min-width: 140px; padding: 0 16px; }
       #np-next-name { font-size: 15px; }
     }
+    @media (max-width: 1120px) {
+      #toolbar { gap: 8px; padding: 8px 10px; }
+      .t-sep { display: none; }
+      #audio-status { order: 20; flex: 1 1 100%; max-width: none; }
+      .spacer { display: none; }
+    }
     @media (max-width: 900px) {
+      #song-file-actions {
+        width: 100%;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding-bottom: 2px;
+        scrollbar-width: thin;
+      }
+      #song-file-actions::-webkit-scrollbar { height: 4px; }
+      #song-file-actions::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+      #bpm-detect-result { min-width: 0; max-width: 120px; }
       #np-next-wrap { display: none; }
       #np-chords-wrap { border-right: none; }
       #np-position { width: 140px; }
