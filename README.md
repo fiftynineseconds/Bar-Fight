@@ -46,14 +46,9 @@ Future plans:
 - **Auth:** to be added before any persistence features
 - **Goal:** save/load songs per user
 
-## TODO:
-
-- [ ] Optimize for iPad
-- [ ] It should have some kind of flashing button or something that is an indicator of the tempo, and be switchable between on and off. It could even play a click and have that be a toggle.
-
 ## Docker Setup
 
 `docker-compose.yml` runs a single nginx container serving `index.html`.
 Structure is intentionally minimal so a C# API container and a database container can be added to the compose file later without rearchitecting.
 
-run docker compose up then navigate to localhost:8080
+run docker compose up then navigate to localhost:8080 or just server index.html with app.js in the same dir.
