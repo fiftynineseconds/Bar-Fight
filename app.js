@@ -84,6 +84,7 @@ let audioStartOffsetSec = 0;
 let draggingSongStart = false;
 let sectionInteraction = null;
 let suppressTimelineClick = false;
+let activeSongStartPointerId = null;
 let loadedAudioBuffer = null;
 let loadedAudioBlob = null;
 let loadedAudioSourceUrl = '';
@@ -292,6 +293,7 @@ function beginSongStartDrag(event) {
     return;
   }
   draggingSongStart = true;
+  activeSongStartPointerId = event.pointerId ?? null;
   document.body.style.cursor = 'ew-resize';
   updateSongStartFromPointer(event.clientX);
 }
@@ -367,6 +369,7 @@ function cleanupAudioUrl() {
 function clearLoadedAudio() {
   pause();
   draggingSongStart = false;
+  activeSongStartPointerId = null;
   document.body.style.cursor = '';
   cleanupAudioUrl();
   audioPlayer.removeAttribute('src');
@@ -804,6 +807,7 @@ function beginSectionMove(event, sectionId) {
     mode: 'move',
     sectionId,
     startClientX: event.clientX,
+    pointerId: event.pointerId ?? null,
   };
   document.body.style.cursor = 'grabbing';
   refresh();
@@ -826,6 +830,7 @@ function beginSectionResize(event, sectionId, side) {
     mode: side === 'left' ? 'resize-left' : 'resize-right',
     sectionId,
     startClientX: event.clientX,
+    pointerId: event.pointerId ?? null,
     targetIndex,
     startBars: targetSection.bars,
     boundaryBeat,
@@ -1328,8 +1333,8 @@ function renderTimeline() {
       </div>
       <div class="tl-section-handle right" aria-hidden="true"></div>
     `;
-    block.onmousedown = (event) => {
-      if (event.button !== 0 || event.target.closest('.tl-section-handle')) {
+    block.onpointerdown = (event) => {
+      if (!event.isPrimary || event.button !== 0 || event.target.closest('.tl-section-handle')) {
         return;
       }
       event.preventDefault();
@@ -1348,7 +1353,10 @@ function renderTimeline() {
     const leftHandle = block.querySelector('.tl-section-handle.left');
     const rightHandle = block.querySelector('.tl-section-handle.right');
     if (leftHandle) {
-      leftHandle.onmousedown = (event) => {
+      leftHandle.onpointerdown = (event) => {
+        if (!event.isPrimary || event.button !== 0) {
+          return;
+        }
         event.preventDefault();
         event.stopPropagation();
         beginSectionResize(event, sec.id, 'left');
@@ -1356,7 +1364,10 @@ function renderTimeline() {
       leftHandle.style.display = sectionStart > 0 ? '' : 'none';
     }
     if (rightHandle) {
-      rightHandle.onmousedown = (event) => {
+      rightHandle.onpointerdown = (event) => {
+        if (!event.isPrimary || event.button !== 0) {
+          return;
+        }
         event.preventDefault();
         event.stopPropagation();
         beginSectionResize(event, sec.id, 'right');
@@ -1372,7 +1383,10 @@ function renderTimeline() {
     marker.id = 'song-start-marker';
     marker.title = 'Drag to line up where bar 1 starts in the audio';
     marker.style.left = `${bpx(leadIn)}px`;
-    marker.onmousedown = (event) => {
+    marker.onpointerdown = (event) => {
+      if (!event.isPrimary || event.button !== 0) {
+        return;
+      }
       event.preventDefault();
       event.stopPropagation();
       beginSongStartDrag(event);
@@ -1811,8 +1825,12 @@ document.getElementById('timeline-wrap').onclick = (event) => {
   seekToBeat((x / PX_PER_BEAT) - timelineLeadInBeats());
 };
 
-window.addEventListener('mousemove', (event) => {
+window.addEventListener('pointermove', (event) => {
   if (sectionInteraction) {
+    if (sectionInteraction.pointerId != null && event.pointerId !== sectionInteraction.pointerId) {
+      return;
+    }
+    event.preventDefault();
     if (Math.abs(event.clientX - sectionInteraction.startClientX) > 3) {
       suppressTimelineClick = true;
     }
@@ -1826,19 +1844,41 @@ window.addEventListener('mousemove', (event) => {
   if (!draggingSongStart) {
     return;
   }
+  if (activeSongStartPointerId != null && event.pointerId !== activeSongStartPointerId) {
+    return;
+  }
+  event.preventDefault();
   updateSongStartFromPointer(event.clientX);
 });
 
-window.addEventListener('mouseup', () => {
+window.addEventListener('pointerup', (event) => {
   if (sectionInteraction) {
+    if (sectionInteraction.pointerId != null && event.pointerId !== sectionInteraction.pointerId) {
+      return;
+    }
     endSectionInteraction();
     return;
   }
   if (!draggingSongStart) {
     return;
   }
+  if (activeSongStartPointerId != null && event.pointerId !== activeSongStartPointerId) {
+    return;
+  }
   draggingSongStart = false;
+  activeSongStartPointerId = null;
   document.body.style.cursor = '';
+});
+
+window.addEventListener('pointercancel', (event) => {
+  if (sectionInteraction && (sectionInteraction.pointerId == null || event.pointerId === sectionInteraction.pointerId)) {
+    endSectionInteraction();
+  }
+  if (draggingSongStart && (activeSongStartPointerId == null || event.pointerId === activeSongStartPointerId)) {
+    draggingSongStart = false;
+    activeSongStartPointerId = null;
+    document.body.style.cursor = '';
+  }
 });
 
 audioPlayer.onended = () => {

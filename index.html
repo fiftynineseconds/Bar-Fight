@@ -18,7 +18,13 @@
     html, body { height: 100%; }
     body {
       background: var(--bg); color: var(--text); font-family: var(--font-ui); font-size: 14px;
-      display: flex; flex-direction: column; height: 100vh; padding: 14px; overflow: hidden;
+      display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh;
+      padding:
+        calc(14px + env(safe-area-inset-top))
+        calc(14px + env(safe-area-inset-right))
+        calc(14px + env(safe-area-inset-bottom))
+        calc(14px + env(safe-area-inset-left));
+      overflow: hidden;
       -webkit-font-smoothing: antialiased;
     }
     #app-shell {
@@ -219,6 +225,8 @@
       position: relative; height: 244px; flex-shrink: 0; overflow-x: auto; overflow-y: hidden; background-color: #100c06;
       background-image: repeating-linear-gradient(45deg, rgba(255,200,100,0.025) 0px, rgba(255,200,100,0.025) 1px, transparent 1px, transparent 12px);
       border-bottom: 1px solid var(--border); cursor: crosshair; scrollbar-width: thin; scrollbar-color: var(--border) #100c06;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-x;
     }
     #timeline-wrap::-webkit-scrollbar { height: 5px; }
     #timeline-wrap::-webkit-scrollbar-track { background: #100c06; }
@@ -244,7 +252,7 @@
     #song-start-marker {
       position: absolute; top: 30px; bottom: 0; width: 2px; border: none; padding: 0;
       background: #f59e0b; box-shadow: 0 0 6px rgba(245,158,11,0.8);
-      z-index: 12; cursor: ew-resize;
+      z-index: 12; cursor: ew-resize; touch-action: none;
     }
     #song-start-marker::before {
       content: "Song Start"; position: absolute; top: 8px; left: 8px;
@@ -260,7 +268,7 @@
     .tl-section {
       position: absolute; top: 40px; height: 194px; border-radius: 12px; padding: 16px; overflow: hidden;
       cursor: pointer; transition: filter 0.15s, transform 0.15s; border: 1px solid rgba(255,235,185,0.22);
-      z-index: 3; user-select: none;
+      z-index: 3; user-select: none; touch-action: none;
     }
     .tl-section:hover { filter: brightness(1.15); transform: translateY(-1px); }
     .tl-section.dragging {
@@ -271,7 +279,7 @@
     .tl-section-body { position: relative; z-index: 1; }
     .tl-section-handle {
       position: absolute; top: 0; bottom: 0; width: 12px; z-index: 2; opacity: 0;
-      transition: opacity 0.12s; cursor: ew-resize;
+      transition: opacity 0.12s; cursor: ew-resize; touch-action: none;
       background: linear-gradient(to right, rgba(255,255,255,0.24), rgba(255,255,255,0));
     }
     .tl-section-handle.right {
@@ -493,6 +501,36 @@
       #print-view-head { flex-direction: column; }
       #print-actions { width: 100%; }
       #print-sections-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (hover: none), (pointer: coarse) {
+      .t-btn,
+      .song-file-btn,
+      #editor-toggle,
+      #print-view-btn,
+      #detect-bpm-btn,
+      #tap-btn,
+      #sidebar-add,
+      .sidebar-chip,
+      .move-btn,
+      .rm-btn {
+        min-height: 42px;
+      }
+      #countoff-toggle {
+        width: 20px;
+        height: 20px;
+      }
+      #song-title,
+      #countoff-beats,
+      .type-sel,
+      .num-in,
+      .time-sel,
+      .chord-in {
+        font-size: 16px;
+      }
+      .tl-section-handle {
+        width: 18px;
+        opacity: 0.95;
+      }
     }
     @media print {
       @page { margin: 0.35in; }
