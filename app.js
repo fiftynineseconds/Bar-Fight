@@ -784,27 +784,13 @@ function fmtTime(seconds) {
 
 function renderPrintView() {
   const titleEl = document.getElementById('print-song-title');
-  const subtitleEl = document.getElementById('print-song-subtitle');
-  const bpmEl = document.getElementById('print-stat-bpm');
-  const sectionsEl = document.getElementById('print-stat-sections');
-  const barsEl = document.getElementById('print-stat-bars');
-  const durationEl = document.getElementById('print-stat-duration');
   const listEl = document.getElementById('print-sections-list');
 
-  if (!titleEl || !subtitleEl || !bpmEl || !sectionsEl || !barsEl || !durationEl || !listEl) {
+  if (!titleEl || !listEl) {
     return;
   }
 
-  const bars = totalBars();
-  const beats = totalBeats();
-  const durationSec = (beats * 60) / song.bpm;
-
   titleEl.textContent = song.title || 'Untitled Song';
-  subtitleEl.textContent = `BPM ${song.bpm}`;
-  bpmEl.textContent = String(song.bpm);
-  sectionsEl.textContent = String(song.sections.length);
-  barsEl.textContent = formatBars(bars);
-  durationEl.textContent = fmtTime(durationSec);
 
   listEl.innerHTML = '';
   song.sections.forEach((sec, index) => {
@@ -823,13 +809,10 @@ function renderPrintView() {
     name.className = 'print-section-name';
     name.textContent = `${index + 1}. ${sec.type}`;
 
-    const meta = document.createElement('span');
-    meta.className = 'print-section-meta';
-    meta.textContent = `${formatBars(sec.bars)} bars · ${sec.bpb}/${sec.den}`;
-
     head.appendChild(dot);
     head.appendChild(name);
-    head.appendChild(meta);
+
+    row.style.borderLeftColor = color.fill;
 
     const chords = document.createElement('div');
     chords.className = 'print-section-chords';
