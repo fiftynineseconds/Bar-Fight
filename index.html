@@ -67,6 +67,47 @@
     }
     #bpm-input:focus { color: #fcd34d; }
     .bpm-label { font-size: 9px; font-weight: 700; letter-spacing: 0.2em; color: var(--muted2); text-transform: uppercase; margin-top: 1px; }
+    #countoff-block {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 8px;
+      border-left: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+    }
+    #countoff-toggle {
+      width: 15px;
+      height: 15px;
+      accent-color: var(--amber);
+      cursor: pointer;
+    }
+    #countoff-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text2);
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      user-select: none;
+      cursor: pointer;
+    }
+    #countoff-beats {
+      width: 48px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 700;
+      padding: 5px 6px;
+      text-align: center;
+      transition: border-color 0.15s;
+    }
+    #countoff-beats:focus {
+      outline: none;
+      border-color: var(--amber);
+    }
     #progress-wrap { flex: 1 1 220px; min-width: 200px; max-width: 320px; display: flex; flex-direction: column; gap: 3px; }
     #progress-track { height: 7px; background: var(--bg4); border-radius: 3px; overflow: hidden; border: 1px solid var(--border); }
     #progress-fill { height: 100%; width: 0; background: linear-gradient(90deg, var(--amber-dim), var(--amber)); border-radius: 3px; }
@@ -386,6 +427,32 @@
       color: #3f311d;
       white-space: pre-wrap;
     }
+    #countoff-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 1100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.12s ease;
+      background: radial-gradient(circle at center, rgba(10, 8, 7, 0.55), rgba(10, 8, 7, 0.14) 56%, rgba(10, 8, 7, 0));
+    }
+    #countoff-overlay.show { opacity: 1; }
+    #countoff-value {
+      min-width: 100px;
+      text-align: center;
+      font-family: var(--font-ui);
+      font-size: clamp(56px, 12vw, 132px);
+      font-weight: 900;
+      letter-spacing: 0.04em;
+      color: #fef3c7;
+      text-shadow: 0 0 22px rgba(245,158,11,0.64), 0 8px 20px rgba(0,0,0,0.5);
+      transform: scale(0.82);
+      transition: transform 0.1s linear;
+    }
+    #countoff-overlay.pulse #countoff-value { transform: scale(1); }
     @media (max-width: 1200px) {
       #progress-wrap { display: none; }
       #sidebar { width: 164px; }
@@ -400,6 +467,7 @@
     @media (max-width: 1120px) {
       #toolbar { gap: 8px; padding: 8px 10px; }
       .t-sep { display: none; }
+      #countoff-block { order: 8; }
       #audio-status { order: 20; flex: 1 1 100%; max-width: none; }
       .spacer { display: none; }
     }
@@ -474,6 +542,11 @@
       <div id="bpm-block">
         <input id="bpm-input" type="number" value="120" min="20" max="400" />
         <div class="bpm-label">BPM</div>
+      </div>
+      <div id="countoff-block" title="Show a visual count before playback starts">
+        <input id="countoff-toggle" type="checkbox" checked />
+        <label id="countoff-label" for="countoff-toggle">Count-off</label>
+        <input id="countoff-beats" type="number" value="4" min="1" max="16" step="1" title="Count-off length in beats" />
       </div>
       <button id="tap-btn" title="Tap to set BPM (T)">Tap</button>
       <div id="progress-wrap">
@@ -567,6 +640,9 @@
       </div>
       <div id="print-sections-list"></div>
     </div>
+  </div>
+  <div id="countoff-overlay" aria-hidden="true">
+    <div id="countoff-value">4</div>
   </div>
   <script src="bpm-detector.js"></script>
   <script src="app.js"></script>

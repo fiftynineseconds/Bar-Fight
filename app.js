@@ -90,6 +90,119 @@ let loadedAudioSourceUrl = '';
 let detectingBpm = false;
 let expectedAudioFileName = '';
 let printViewOpen = false;
+const COUNT_OFF_DEFAULT_ENABLED = true;
+const COUNT_OFF_DEFAULT_BEATS = 4;
+const COUNT_OFF_MIN_BEATS = 1;
+const COUNT_OFF_MAX_BEATS = 16;
+let countOffEnabled = COUNT_OFF_DEFAULT_ENABLED;
+let countOffBeats = COUNT_OFF_DEFAULT_BEATS;
+let countOffAbortController = null;
+let countOffRunning = false;
+
+function clampCountOffBeats(value) {
+  const parsed = parseInt(value, 10);
+  if (!Number.isFinite(parsed)) {
+    return COUNT_OFF_DEFAULT_BEATS;
+  }
+  return Math.max(COUNT_OFF_MIN_BEATS, Math.min(COUNT_OFF_MAX_BEATS, parsed));
+}
+
+function syncCountOffInputs() {
+  const toggle = document.getElementById('countoff-toggle');
+  const beatsInput = document.getElementById('countoff-beats');
+  if (!toggle || !beatsInput) {
+    return;
+  }
+  toggle.checked = countOffEnabled;
+  beatsInput.value = String(countOffBeats);
+  beatsInput.disabled = !countOffEnabled;
+}
+
+function hideCountOffOverlay() {
+  const overlay = document.getElementById('countoff-overlay');
+  if (!overlay) {
+    return;
+  }
+  overlay.classList.remove('show', 'pulse');
+  overlay.setAttribute('aria-hidden', 'true');
+}
+
+function updateCountOffOverlay(value) {
+  const overlay = document.getElementById('countoff-overlay');
+  const valueEl = document.getElementById('countoff-value');
+  if (!overlay || !valueEl) {
+    return;
+  }
+  valueEl.textContent = String(value);
+  overlay.classList.add('show');
+  overlay.setAttribute('aria-hidden', 'false');
+  overlay.classList.remove('pulse');
+  void overlay.offsetWidth;
+  overlay.classList.add('pulse');
+}
+
+function cancelCountOff() {
+  if (countOffAbortController) {
+    countOffAbortController.abort();
+    countOffAbortController = null;
+  }
+  countOffRunning = false;
+  hideCountOffOverlay();
+  setPlayButtonState();
+}
+
+function sleepWithAbort(ms, signal) {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+
+    function onAbort() {
+      window.clearTimeout(timer);
+      reject(new DOMException('Count-off canceled', 'AbortError'));
+    }
+
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+async function runVisualCountOff() {
+  if (!countOffEnabled || countOffBeats <= 0) {
+    return true;
+  }
+
+  cancelCountOff();
+  const controller = new AbortController();
+  countOffAbortController = controller;
+  countOffRunning = true;
+  setPlayButtonState();
+
+  const msPerBeat = (60 / Math.max(1, song.bpm)) * 1000;
+  try {
+    for (let beat = countOffBeats; beat >= 1; beat -= 1) {
+      if (controller.signal.aborted) {
+        throw new DOMException('Count-off canceled', 'AbortError');
+      }
+      updateCountOffOverlay(beat);
+      await sleepWithAbort(msPerBeat, controller.signal);
+    }
+    hideCountOffOverlay();
+    countOffRunning = false;
+    countOffAbortController = null;
+    setPlayButtonState();
+    return true;
+  } catch (error) {
+    hideCountOffOverlay();
+    countOffRunning = false;
+    countOffAbortController = null;
+    setPlayButtonState();
+    if (error && error.name === 'AbortError') {
+      return false;
+    }
+    throw error;
+  }
+}
 
 function blobToDataUrl(blob) {
   return new Promise((resolve, reject) => {
@@ -419,6 +532,7 @@ function syncSongInputs() {
   const bpmInput = document.getElementById('bpm-input');
   titleInput.value = song.title;
   bpmInput.value = String(song.bpm);
+  syncCountOffInputs();
 }
 
 function sanitizeSong(rawSong) {
@@ -440,6 +554,9 @@ function sanitizeSong(rawSong) {
   const rawEmbeddedAudio = rawAudio.embedded && typeof rawAudio.embedded === 'object' ? rawAudio.embedded : {};
   const audioEmbeddedDataUrl = typeof rawEmbeddedAudio.dataUrl === 'string' ? rawEmbeddedAudio.dataUrl : '';
   const audioEmbeddedMimeType = typeof rawEmbeddedAudio.mimeType === 'string' ? rawEmbeddedAudio.mimeType : '';
+  const rawCountOff = rawSong.countOff && typeof rawSong.countOff === 'object' ? rawSong.countOff : {};
+  const countOffEnabledValue = typeof rawCountOff.enabled === 'boolean' ? rawCountOff.enabled : COUNT_OFF_DEFAULT_ENABLED;
+  const countOffBeatsValue = clampCountOffBeats(rawCountOff.beats);
   const usedIds = new Set();
 
   const sections = rawSong.sections.map((section, index) => {
@@ -493,6 +610,8 @@ function sanitizeSong(rawSong) {
     audioUrl,
     audioEmbeddedDataUrl,
     audioEmbeddedMimeType,
+    countOffEnabled: countOffEnabledValue,
+    countOffBeats: countOffBeatsValue,
   };
 }
 
@@ -523,6 +642,9 @@ async function loadSongFromData(rawSong, options = {}) {
     bpm: nextSong.bpm,
     sections: nextSong.sections,
   };
+  countOffEnabled = nextSong.countOffEnabled;
+  countOffBeats = nextSong.countOffBeats;
+  cancelCountOff();
 
   clearLoadedAudio();
   expectedAudioFileName = nextSong.audioFileName;
@@ -607,6 +729,10 @@ async function saveSongToDisk() {
       title: song.title,
       bpm: song.bpm,
       sections: song.sections,
+      countOff: {
+        enabled: countOffEnabled,
+        beats: countOffBeats,
+      },
       audio: {
         startOffsetSec: Math.round(audioStartOffsetSec * 1000) / 1000,
         fileName: loadedAudioName || expectedAudioFileName || '',
@@ -893,8 +1019,9 @@ function getSongBarNumber(beat) {
 
 function setPlayButtonState() {
   const playBtn = document.getElementById('play-btn');
-  playBtn.innerHTML = playing ? ICON_PAUSE : ICON_PLAY;
-  playBtn.title = playing ? 'Pause' : 'Play';
+  const active = playing || countOffRunning;
+  playBtn.innerHTML = active ? ICON_PAUSE : ICON_PLAY;
+  playBtn.title = active ? 'Pause' : 'Play';
 }
 
 function tick(timestamp) {
@@ -929,6 +1056,19 @@ function tick(timestamp) {
 }
 
 async function play() {
+  if (countOffRunning) {
+    cancelCountOff();
+    return;
+  }
+
+  const shouldCountOff = countOffEnabled;
+  if (shouldCountOff) {
+    const countCompleted = await runVisualCountOff();
+    if (!countCompleted || playing) {
+      return;
+    }
+  }
+
   if (currentBeat >= totalTimelineBeats()) {
     currentBeat = loadedAudioDurationSec > 0 ? -timelineLeadInBeats() : 0;
   }
@@ -953,6 +1093,7 @@ async function play() {
 }
 
 function pause() {
+  cancelCountOff();
   playing = false;
   if (loadedAudioDurationSec > 0) {
     audioPlayer.pause();
@@ -1452,6 +1593,19 @@ document.getElementById('bpm-input').oninput = (event) => {
   }
 };
 
+document.getElementById('countoff-toggle').onchange = (event) => {
+  countOffEnabled = Boolean(event.target.checked);
+  if (!countOffEnabled) {
+    cancelCountOff();
+  }
+  syncCountOffInputs();
+};
+
+document.getElementById('countoff-beats').oninput = (event) => {
+  countOffBeats = clampCountOffBeats(event.target.value);
+  event.target.value = String(countOffBeats);
+};
+
 // --- Tap tempo ---
 const tapTimes = [];
 let tapResetTimer = null;
@@ -1627,6 +1781,8 @@ function clearSong() {
     return;
   }
   song = { title: 'New Song', bpm: 120, sections: [{ id: 1, type: 'Verse', bars: 4, bpb: 4, den: 4, chords: '' }] };
+  countOffEnabled = COUNT_OFF_DEFAULT_ENABLED;
+  countOffBeats = COUNT_OFF_DEFAULT_BEATS;
   nextId = 2;
   currentBeat = 0;
   startBeat = 0;
@@ -1700,6 +1856,7 @@ updateAudioStatus();
 updateAudioClearState();
 updateAudioOffsetUi();
 updateBpmDetectionUi();
+hideCountOffOverlay();
 refresh();
 
 (async () => {
