@@ -39,7 +39,33 @@
 
 ## Stack & Structure
 
-Currently: a single `index.html` and 'app.js' served by nginx in Docker. Docker isn't necessary at this point.
+Plain static files, no framework, no build step — `index.html` loads classic scripts (works from `file://` and any static server):
+
+- `js/constants.js` — layout metrics, section palette, keyboard shortcuts
+- `js/state.js` — the single mutable app state (`window.BarFight.state`)
+- `js/timing.js` — beat/bar/second/pixel math
+- `js/countoff.js` — visual count-off
+- `js/audio.js` — audio loading, waveform, song-start offset, BPM detect wiring
+- `js/song-io.js` — song JSON validation, save/load, URL fetch
+- `js/playback.js` — transport and the rAF tick loop
+- `js/sections.js` — section add/reorder/live-build/drag interactions
+- `js/render.js` — all DOM rendering
+- `js/main.js` — event wiring and startup
+- `bpm-detector.js` — standalone BPM detection (`window.BpmDetector`)
+
+Each file is an IIFE exporting onto the `window.BarFight` namespace (kept as classic scripts, not ES modules, so the app stays build-free and the test harness can run it in jsdom).
+
+### Features & Tests
+
+- `FEATURES.md` catalogs every behavior with stable IDs (MODEL-1, PLAY-3, …).
+- `tests/` is a vitest + jsdom suite that boots the real `index.html` + scripts and drives the app through the DOM. Run with:
+
+```
+npm install
+npm test
+```
+
+Docker isn't necessary at this point.
 
 Future plans:
 - **Backend:** C# / ASP.NET Core
