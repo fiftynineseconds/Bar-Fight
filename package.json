@@ -1,0 +1,15 @@
+{
+  "name": "bar-fight",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Dev tooling for Bar Fight. The app itself is plain static files (index.html + classic scripts) with no build step.",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "jsdom": "^26.1.0",
+    "vitest": "^3.2.4"
+  }
+}
