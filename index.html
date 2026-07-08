@@ -220,6 +220,29 @@
       cursor: pointer; text-align: center; transition: background 0.15s, color 0.15s;
     }
     #sidebar-add:hover { background: var(--bg3); color: var(--amber); border-color: var(--amber); }
+    #shortcuts-toggle {
+      flex-shrink: 0; margin: 0 8px 8px; padding: 6px; background: transparent; border: none;
+      border-radius: 7px; color: var(--muted2); font-size: 11px; font-weight: 600; font-family: var(--font-ui);
+      cursor: pointer; text-align: center; transition: background 0.15s, color 0.15s;
+    }
+    #shortcuts-toggle:hover { background: var(--bg3); color: var(--text2); }
+    #shortcuts-toggle.active { color: var(--amber); }
+    #shortcuts-panel {
+      flex-shrink: 0; margin: 0 8px 6px; padding: 9px 10px; background: var(--bg3);
+      border: 1px solid var(--border); border-radius: 7px;
+      display: flex; flex-direction: column; gap: 5px;
+      overflow-y: auto; max-height: 45%; scrollbar-width: thin; scrollbar-color: var(--border) var(--bg3);
+    }
+    #shortcuts-panel[hidden] { display: none; }
+    .shortcut-hint { font-size: 10px; line-height: 1.35; color: var(--muted); margin-bottom: 3px; }
+    .shortcut-row { display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 600; color: var(--text2); }
+    .shortcut-key {
+      font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--text);
+      background: var(--bg4); border: 1px solid var(--border-hi); border-bottom-width: 2px;
+      border-radius: 4px; min-width: 22px; text-align: center; padding: 2px 5px; flex-shrink: 0;
+    }
+    .shortcut-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .shortcut-sep { height: 1px; background: var(--border); margin: 3px 0; flex-shrink: 0; }
     #right-panel { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
     #timeline-wrap {
       position: relative; height: 244px; flex-shrink: 0; overflow-x: auto; overflow-y: hidden; background-color: #100c06;
@@ -647,6 +670,8 @@
         <div id="sidebar-header">Sections</div>
         <div id="sidebar-list"></div>
         <button id="sidebar-add">+ Add Section</button>
+        <div id="shortcuts-panel" hidden></div>
+        <button id="shortcuts-toggle" type="button" title="Show keyboard shortcuts">⌨ Key Shortcuts</button>
       </div>
       <div id="right-panel">
         <div id="timeline-wrap">

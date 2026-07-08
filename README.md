@@ -9,6 +9,7 @@
 - Enter a song's BPM and build a section list (Intro, Verse, Chorus, Bridge, Solo, Outro, etc.)
 - Each section has a bar count, time signature, and chord notes
 - Hit play — a beat-locked playhead scrolls across the timeline in real time
+- Build a song live during playback: press `c` (Chorus), `v` (Verse), `b` (Bridge), `i` (Intro), `s` (Solo), `o` (Outro), `p` (Pre-Chorus), `k` (Break), or `a` (repeat current section type) to drop a new 2-bar section at the playhead, snapped to the nearest bar — the previous section trims or stretches to meet it. Without loaded audio, the last section auto-extends during a live-build take so playback never runs out of runway
 - A header bar shows the current section, bar number, beat, and chords at a glance, with a "Next: [section]" preview
 - Click anywhere on the timeline to seek
 - Save songs to a portable JSON file (including currently loaded audio) and load them back from disk
@@ -38,7 +39,7 @@
 
 ## Stack & Structure
 
-Currently: a single `index.html` served by nginx in Docker.
+Currently: a single `index.html` and 'app.js' served by nginx in Docker. Docker isn't necessary at this point.
 
 Future plans:
 - **Backend:** C# / ASP.NET Core

@@ -1,6 +1,19 @@
 const PX_PER_BEAT = 40;
 const SECTION_RESIZE_BEAT_STEP = 1;
 const SECTION_MAX_BARS = 64;
+const NEW_SECTION_BARS = 2;
+// Live-build shortcuts: press while the song plays to drop a section at the playhead.
+// "a" (handled separately) repeats the current section's type. "t" is tap tempo.
+const SECTION_KEY_SHORTCUTS = {
+  c: 'Chorus',
+  v: 'Verse',
+  b: 'Bridge',
+  i: 'Intro',
+  s: 'Solo',
+  o: 'Outro',
+  p: 'Pre-Chorus',
+  k: 'Break',
+};
 
 const ICON_PLAY = '<svg width="11" height="13" viewBox="0 0 11 13" fill="currentColor" aria-hidden="true"><path d="M1.5 1.5l8 5-8 5z"></path></svg>';
 const ICON_PAUSE = '<svg width="11" height="13" viewBox="0 0 11 13" fill="currentColor" aria-hidden="true"><rect x="1" y="1" width="3" height="11" rx="1"></rect><rect x="7" y="1" width="3" height="11" rx="1"></rect></svg>';
@@ -68,6 +81,7 @@ let song = {
 
 let nextId = 100;
 let playing = false;
+let liveBuildActive = false;
 let currentBeat = 0;
 let startTime = null;
 let startBeat = 0;
@@ -1030,7 +1044,7 @@ function setPlayButtonState() {
 }
 
 function tick(timestamp) {
-  const total = totalTimelineBeats();
+  let total = totalTimelineBeats();
   let beat = currentBeat;
 
   if (loadedAudioDurationSec > 0) {
@@ -1041,6 +1055,17 @@ function tick(timestamp) {
     }
     const bps = song.bpm / 60;
     beat = startBeat + ((timestamp - startTime) / 1000) * bps;
+  }
+
+  // Live building without audio: grow the last section so playback never runs out of runway
+  if (beat >= total && liveBuildActive && loadedAudioDurationSec <= 0) {
+    const last = song.sections[song.sections.length - 1];
+    const grown = normalizeSectionBars(last.bars + 1, last);
+    if (grown > last.bars) {
+      last.bars = grown;
+      total = totalTimelineBeats();
+      refresh();
+    }
   }
 
   if (beat >= total) {
@@ -1100,6 +1125,7 @@ async function play() {
 function pause() {
   cancelCountOff();
   playing = false;
+  liveBuildActive = false;
   if (loadedAudioDurationSec > 0) {
     audioPlayer.pause();
   }
@@ -1427,6 +1453,48 @@ function renderSidebar() {
   });
 }
 
+function renderShortcutsPanel() {
+  const panel = document.getElementById('shortcuts-panel');
+  if (!panel) {
+    return;
+  }
+  panel.innerHTML = '';
+
+  const addRow = (keyLabel, label, dotColor) => {
+    const row = document.createElement('div');
+    row.className = 'shortcut-row';
+    const key = document.createElement('span');
+    key.className = 'shortcut-key';
+    key.textContent = keyLabel;
+    row.appendChild(key);
+    if (dotColor) {
+      const dot = document.createElement('span');
+      dot.className = 'shortcut-dot';
+      dot.style.background = dotColor;
+      row.appendChild(dot);
+    }
+    row.appendChild(document.createTextNode(label));
+    panel.appendChild(row);
+  };
+
+  const hint = document.createElement('div');
+  hint.className = 'shortcut-hint';
+  hint.textContent = 'Press while the song plays to drop a section at the playhead.';
+  panel.appendChild(hint);
+
+  Object.entries(SECTION_KEY_SHORTCUTS).forEach(([key, type]) => {
+    addRow(key.toUpperCase(), type, COLORS[type].fill);
+  });
+  addRow('A', 'Repeat section', null);
+
+  const sep = document.createElement('div');
+  sep.className = 'shortcut-sep';
+  panel.appendChild(sep);
+
+  addRow('Spc', 'Play / Pause', null);
+  addRow('T', 'Tap tempo', null);
+}
+
 function renderEditor() {
   const list = document.getElementById('sections-list');
   list.innerHTML = '';
@@ -1694,6 +1762,21 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 't' || event.key === 'T') {
     event.preventDefault();
     onTap();
+    return;
+  }
+
+  // Section shortcuts must not swallow browser combos like Ctrl+S or Ctrl+C
+  if (event.ctrlKey || event.metaKey || event.altKey) {
+    return;
+  }
+
+  const key = event.key.toLowerCase();
+  if (key === 'a' || SECTION_KEY_SHORTCUTS[key]) {
+    event.preventDefault();
+    if (event.repeat) {
+      return;
+    }
+    addSectionAtPlayhead(key === 'a' ? null : SECTION_KEY_SHORTCUTS[key]);
   }
 });
 
@@ -1772,6 +1855,12 @@ document.getElementById('load-song-url-btn').onclick = async () => {
   }
 };
 
+document.getElementById('shortcuts-toggle').onclick = () => {
+  const panel = document.getElementById('shortcuts-panel');
+  panel.hidden = !panel.hidden;
+  document.getElementById('shortcuts-toggle').classList.toggle('active', !panel.hidden);
+};
+
 document.getElementById('editor-toggle').onclick = () => {
   const editor = document.getElementById('editor');
   const hidden = editor.classList.toggle('hidden');
@@ -1801,6 +1890,7 @@ function clearSong() {
   currentBeat = 0;
   startBeat = 0;
   startTime = null;
+  expectedAudioFileName = '';
   syncSongInputs();
   clearLoadedAudio();
 }
@@ -1808,6 +1898,54 @@ function clearSong() {
 function addSection() {
   song.sections.push({ id: nextId, type: 'Verse', bars: 4, bpb: 4, den: 4, chords: '' });
   nextId += 1;
+  refresh();
+}
+
+function addSectionAtPlayhead(requestedType) {
+  const beat = currentBeat;
+  if (beat < 0 || song.sections.length === 0) {
+    return;
+  }
+
+  const info = getSectionAt(beat);
+  let template;
+  let insertIndex;
+
+  if (info) {
+    const { sec, idx, beatInSec } = info;
+    const boundaryBars = Math.round(beatInSec / secQpb(sec));
+    template = sec;
+    if (boundaryBars <= 0) {
+      // Playhead snaps to this section's start: slot the new section in front of it
+      insertIndex = idx;
+    } else {
+      sec.bars = normalizeSectionBars(boundaryBars, sec);
+      insertIndex = idx + 1;
+    }
+  } else {
+    // Playhead is past the last section: stretch it to meet the new one
+    const lastIndex = song.sections.length - 1;
+    const last = song.sections[lastIndex];
+    const barsToPlayhead = Math.round((beat - getSectionStartBeatByIndex(lastIndex)) / secQpb(last));
+    last.bars = normalizeSectionBars(Math.max(last.bars, barsToPlayhead), last);
+    template = last;
+    insertIndex = song.sections.length;
+  }
+
+  song.sections.splice(insertIndex, 0, {
+    id: nextId,
+    type: requestedType || template.type,
+    bars: NEW_SECTION_BARS,
+    bpb: template.bpb,
+    den: template.den,
+    chords: '',
+  });
+  nextId += 1;
+
+  if (playing) {
+    liveBuildActive = true;
+  }
+  currentBeat = clampBeat(currentBeat);
   refresh();
 }
 
@@ -1891,6 +2029,7 @@ audioPlayer.onended = () => {
 window.addEventListener('beforeunload', cleanupAudioUrl);
 
 setPlayButtonState();
+renderShortcutsPanel();
 syncSongInputs();
 updateAudioStatus();
 updateAudioClearState();
